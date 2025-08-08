@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductDto, Variant } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { isValidUUID } from '../../../utils/id-validator';
 import { generateSlug } from 'utils/slug-generator';
@@ -142,15 +142,37 @@ export class ProductsService {
       if (!product) {
         throw new NotFoundException('Product does not exist');
       }
-
       const updatedVariants = updateProductDto.variants
-        ? [...product.variants, updateProductDto.variants]
+        ? (() => {
+            const variantsMap = new Map<string, Variant>(
+              product.variants.map((v) => [v.id, v]), // existing variants
+            );
+
+            // merge/update incoming variants
+            updateProductDto.variants.forEach((newVar) => {
+              variantsMap.set(newVar.id, {
+                ...variantsMap.get(newVar.id),
+                ...newVar,
+              });
+            });
+
+            return Array.from(variantsMap.values());
+          })()
         : product.variants;
+
+      const updatedSlug = updateProductDto.name
+        ? generateSlug(updateProductDto.name)
+        : product.slug;
 
       // Find product and update with id
       const { data: updatedProduct, error: updateError } = await this.supabase
         .from('Products')
-        .update({ ...updateProductDto, variants: updatedVariants })
+        .update({
+          ...updateProductDto,
+          slug: updatedSlug,
+          variants: updatedVariants,
+          updated_at: new Date(),
+        })
         .eq('id', id)
         .select();
 

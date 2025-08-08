@@ -31,7 +31,7 @@ export class CreateProductDto {
   variants: Variant[];
 }
 
-class Variant {
+export class Variant {
   @IsString()
   @IsNotEmpty()
   id: string;
