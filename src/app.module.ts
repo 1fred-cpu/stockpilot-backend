@@ -6,7 +6,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { SupabaseModule } from "lib/supabase.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
-
+import { ProductsModule } from "./modules/products/products.module";
 @Module({
     imports: [
         // Load environment variables from .env file
@@ -28,7 +28,8 @@ import { APP_GUARD } from "@nestjs/core";
         ]),
 
         SupabaseModule,
-        StoresModule
+        StoresModule,
+        ProductsModule
     ],
     controllers: [AppController],
     providers: [
@@ -40,5 +41,3 @@ import { APP_GUARD } from "@nestjs/core";
     ]
 })
 export class AppModule {}
-
-
