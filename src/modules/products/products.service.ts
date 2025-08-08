@@ -11,7 +11,7 @@ import { CreateProductDto, Variant } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { isValidUUID } from '../../../utils/id-validator';
 import { generateSlug } from 'utils/slug-generator';
-
+import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class ProductsService {
   private logger = new Logger(ProductsService.name);
@@ -198,19 +198,130 @@ export class ProductsService {
     }
   }
 
-  findAll() {
-    return `This action returns all products`;
+  // Method -- Delete
+  // Access -- Private
+  // Function:  A function to delete a product variant
+  // Returns: The updated product or throws an error if the product does not exist
+  async deleteProductVariant(productId: string, variantId: string) {
+    try {
+      const isProductIdValid = isValidUUID(productId);
+      const isVariantIdValid = isValidUUID(variantId);
+
+      if (!isProductIdValid || !isVariantIdValid) {
+        throw new BadRequestException('Invalid product or variant ID');
+      }
+
+      // Find product and variant
+      const { data: product, error: fetchError } = await this.supabase
+        .from('Products')
+        .select('*')
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!product) {
+        throw new NotFoundException('Product does not exist');
+      }
+
+      const variantExists = product.variants.some((v) => v.id === variantId);
+      if (!variantExists) {
+        throw new NotFoundException('Variant does not exist');
+      }
+
+      // Delete variant
+      const { data: updatedProduct, error: updateError } = await this.supabase
+        .from('Products')
+        .update({
+          variants: product.variants.filter((v) => v.id !== variantId),
+          updated_at: new Date(),
+        })
+        .eq('id', productId)
+        .select();
+
+      if (updateError) {
+        throw new Error('An error occured while deleting product variant');
+      }
+
+      return updatedProduct; // Return the updated product
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      } else if (error instanceof Error) {
+        throw new InternalServerErrorException(error.message);
+      }
+      // Logs error to the  console
+      this.logger.error('Error deleting product variant: ', error.message);
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while deleting the product variant',
+      );
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} product`;
-  }
+  // Method -- Post
+  // Access -- Private
+  // Function:  A function to create a product variant
+  // Returns: The variant product or throws an error
+  async addProductVariant(productId: string, variant: Variant) {
+    try {
+      const isProductIdValid = isValidUUID(productId);
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
-  }
+      if (!isProductIdValid) {
+        throw new BadRequestException('Invalid product ID');
+      }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+      // Find product and variant
+      const { data: product, error: fetchError } = await this.supabase
+        .from('Products')
+        .select('*')
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (fetchError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!product) {
+        throw new NotFoundException('Product does not exist');
+      }
+
+      const variantExists = product.variants.some((v) => v.sku === variant.sku);
+      if (variantExists) {
+        throw new ConflictException('Variant already exists');
+      }
+
+      // Create variant
+      const { data: updatedProduct, error: updateError } = await this.supabase
+        .from('Products')
+        .update({
+          variants: [...product.variants, { ...variant, id: uuidv4() }],
+          updated_at: new Date(),
+        })
+        .eq('id', productId)
+        .select();
+
+      if (updateError) {
+        throw new Error('An error occured while creating product variant');
+      }
+
+      return updatedProduct; // Return the updated product
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      } else if (error instanceof Error) {
+        throw new InternalServerErrorException(error.message);
+      }
+      // Logs error to the  console
+      this.logger.error('Error creating product variant: ', error.message);
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while creating the product variant',
+      );
+    }
   }
 }

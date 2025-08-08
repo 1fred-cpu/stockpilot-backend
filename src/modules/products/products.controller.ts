@@ -9,7 +9,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductDto, Variant } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
@@ -21,6 +21,14 @@ export class ProductsController {
     @Body(ValidationPipe) createProductDto: CreateProductDto,
   ) {
     return this.productsService.createProduct(createProductDto);
+  }
+
+  @Post(':productId/variants')
+  async addProductVariant(
+    @Param('productId') productId: string,
+    @Body(ValidationPipe) variant: Variant,
+  ) {
+    return this.productsService.addProductVariant(productId, variant);
   }
 
   @Get(':id')
@@ -36,8 +44,11 @@ export class ProductsController {
     return this.productsService.updateProduct(id, updateProductDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(+id);
+  @Delete(':productId/variants/:variantId')
+  async deleteProductVariant(
+    @Param('productId') productId: string,
+    @Param('variantId') variantId: string,
+  ) {
+    return this.productsService.deleteProductVariant(productId, variantId);
   }
 }
