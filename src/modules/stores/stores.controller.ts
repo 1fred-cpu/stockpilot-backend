@@ -26,14 +26,12 @@ export class StoresController {
         return this.storesService.findStore(store_id);
     }
 
-    @Get(":id")
-    findOne(@Param("id") id: string) {
-        return this.storesService.findOne(+id);
-    }
-
-    @Patch(":id")
-    update(@Param("id") id: string, @Body() updateStoreDto: UpdateStoreDto) {
-        return this.storesService.update(+id, updateStoreDto);
+    @Patch(":store_id")
+    async updateStore(
+        @Param("store_id") store_id: string,
+        @Body() updateStoreDto: UpdateStoreDto
+    ) {
+        return this.storesService.updateStore(store_id, updateStoreDto);
     }
 
     @Delete(":id")

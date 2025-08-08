@@ -52,14 +52,13 @@ export class StoresService {
 
             return { message: "Store created successfully" };
         } catch (error) {
+            if (error instanceof ConflictException) {
+                throw error; // Re-throw ConflictException
+            } else if (error instanceof Error) {
+                throw new InternalServerErrorException(error.message);
+            }
             // Logs error to the  console
             this.logger.error("Error creating store: ", error.message);
-
-            if (error instanceof Error) {
-                throw new InternalServerErrorException(error.message);
-            } else if (error instanceof ConflictException) {
-                throw error; // Re-throw ConflictException
-            }
             throw new InternalServerErrorException(
                 "An unexpected error occurred while creating the store"
             );
@@ -95,12 +94,12 @@ export class StoresService {
             // Returns data to client
             return data;
         } catch (error) {
-            if (error instanceof Error) {
-                throw new InternalServerErrorException(error.message);
-            } else if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException) {
                 throw error;
             } else if (error instanceof NotFoundException) {
                 throw error;
+            } else if (error instanceof Error) {
+                throw new InternalServerErrorException(error.message);
             }
             // Logs error to the  console
             this.logger.error("Error finding store: ", error.message);
@@ -115,8 +114,8 @@ export class StoresService {
     // Function:  A function to update store
     /* Returns: Update the store if found and return updated store or throwa an
     error if not found */
-    
-    async updateStore(store_id: string) {
+
+    async updateStore(store_id: string, updateStoreDto: UpdateStoreDto) {
         try {
             // Validate the format of store_id if it matches uuid format
             const isStoreIdValid = isValidUUID(store_id);
@@ -124,34 +123,84 @@ export class StoresService {
                 throw new BadRequestException("Invalid format of store_id");
             }
 
-            // Find a store with store_id
+            // Find and update a store with store_id
             const { data, error } = await this.supabase
                 .from("Stores")
-                .select("*")
+                .update(updateStoreDto)
                 .eq("store_id", store_id)
-                .maybeSingle();
+                .select();
 
-            // If an error occurs while finding store throw an error
+            // If an error occurs while updating store throw an error
             if (error) {
-                throw new Error("An error occured while  finding store");
+                throw new Error(
+                    error.message || "An error occured while  updating store"
+                );
             }
-            if (!data) {
+            if (data.length === 0) {
                 throw new NotFoundException("Store not found");
             }
-            // Returns data to client
+            // Return updated data to client
             return data;
         } catch (error) {
-            if (error instanceof Error) {
-                throw new InternalServerErrorException(error.message);
-            } else if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException) {
                 throw error;
             } else if (error instanceof NotFoundException) {
                 throw error;
+            } else if (error instanceof Error) {
+                throw new InternalServerErrorException(error.message);
             }
             // Logs error to the  console
-            this.logger.error("Error finding store: ", error.message);
+            this.logger.error("Error updating store: ", error.message);
             throw new InternalServerErrorException(
-                "An unexpected error occurred while finding  store"
+                "An unexpected error occurred while updating store"
+            );
+        }
+    }
+
+    // Method -- Delete
+    // Access -- Private
+    // Function:  A function to delete store
+    /* Returns: Delete the store if found and return deleted store or throwa an
+    error if not found */
+
+    async deleteStore(store_id: string) {
+        try {
+            // Validate the format of store_id if it matches uuid format
+            const isStoreIdValid = isValidUUID(store_id);
+            if (!isStoreIdValid) {
+                throw new BadRequestException("Invalid format of store_id");
+            }
+
+            // Find and delete a store with store_id
+            const { data, error } = await this.supabase
+                .from("Stores")
+                .delete()
+                .eq("store_id", store_id)
+                .select();
+
+            // If an error occurs while deleting store throw an error
+            if (error) {
+                throw new Error(
+                    error.message || "An error occured while  deleting store"
+                );
+            }
+            if (data.length === 0) {
+                throw new NotFoundException("Store not found");
+            }
+            // Return a message  to client
+            return { message: "Store deleted successfully" };
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            } else if (error instanceof NotFoundException) {
+                throw error;
+            } else if (error instanceof Error) {
+                throw new InternalServerErrorException(error.message);
+            }
+            // Logs error to the  console
+            this.logger.error("Error deleting store: ", error.message);
+            throw new InternalServerErrorException(
+                "An unexpected error occurred while deleting store"
             );
         }
     }
