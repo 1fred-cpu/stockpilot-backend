@@ -70,6 +70,10 @@ export class Variant {
     @IsNotEmpty()
     stock_quantity: number;
 
+    @IsNumber()
+    @IsNotEmpty()
+    low_stock_threshold: number;
+
     @IsUrl()
     @IsNotEmpty()
     image_url: string;

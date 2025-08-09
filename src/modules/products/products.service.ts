@@ -99,7 +99,7 @@ export class ProductsService {
                 throw new BadRequestException("Invalid product ID");
             }
             // Find product with id
-            const { data, error } = await this.supabase
+            const { data: product, error } = await this.supabase
                 .from("Products")
                 .select("*")
                 .eq("id", productId)
@@ -110,11 +110,11 @@ export class ProductsService {
                 throw new Error("An error occured while retrieving product");
             }
 
-            if (!data) {
+            if (!product) {
                 throw new ConflictException("Product does not exist");
             }
 
-            return data; // Return the found product
+            return product; // Return the found product
         } catch (error) {
             if (error instanceof ConflictException) {
                 throw error;
@@ -164,7 +164,12 @@ export class ProductsService {
                 : product.slug;
 
             // update tags if tags need to be changed
-            const updatedTags = [...product.tags, ...updateProductDto.tags];
+            const updatedTags = Array.from(
+                new Set([
+                    ...(product.tags ?? []),
+                    ...(updateProductDto.tags ?? [])
+                ])
+            );
             // Find product and update with id
             const { data: updatedProduct, error: updateError } =
                 await this.supabase
@@ -196,6 +201,61 @@ export class ProductsService {
             this.logger.error("Error updating product: ", error.message);
             throw new InternalServerErrorException(
                 "An unexpected error occurred while updating the product"
+            );
+        }
+    }
+
+    // Method -- Delete
+    // Access -- Private
+    // Function:  A function to delete a product
+    // Returns: The deleted product or throws an error if the product does not exist
+    async deleteProduct(productId: string) {
+        try {
+            // Validate product id if is valid
+            const isProductIdValid = isValidUUID(productId);
+
+            if (!isProductIdValid) {
+                throw new BadRequestException("Invalid product ID");
+            }
+            // Find product with product id
+            const { data: product, error: deleteError } = await this.supabase
+                .from("Products")
+                .delete()
+                .eq("id", productId)
+                .select();
+
+            if (deleteError) {
+                throw new Error("An error occured while deleting product");
+            }
+
+            if (!product) {
+                throw new NotFoundException("Product does not exist");
+            }
+
+            const { data: duplicates } = await this.supabase
+                .from("Products variants")
+                .select("*")
+                .eq("product_id", productId);
+
+            for (const duplicate of duplicates) {
+                await this.supabase
+                    .from("Products variants")
+                    .delete()
+                    .match({ product_id: duplicate.id }); // careful: deletes ALL with that id
+            }
+            return { message: "Product deleted successfully" };
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            } else if (error instanceof NotFoundException) {
+                throw error;
+            } else if (error instanceof Error) {
+                throw new InternalServerErrorException(error.message);
+            }
+            // Logs error to the  console
+            this.logger.error("Error deleting product: ", error.message);
+            throw new InternalServerErrorException(
+                "An unexpected error occurred while deleting the product"
             );
         }
     }
@@ -258,7 +318,7 @@ export class ProductsService {
     // Method -- Delete
     // Access -- Private
     // Function:  A function to delete a product variant
-    // Returns: The updated product or throws an error if the product does not exist
+    // Returns: The deleted product variant or throws an error if the product variant does not exist
     async deleteProductVariant(productId: string, variantId: string) {
         try {
             const isProductIdValid = isValidUUID(productId);
@@ -268,49 +328,23 @@ export class ProductsService {
                 throw new BadRequestException("Invalid product or variant ID");
             }
 
-            // Find and update product variant
-            const { data: updatedProductVariant, error: fetchError } =
+            // Find and delete product variant
+            const { data: deletedProductVariant, error: deleteError } =
                 await this.supabase
                     .from("Products variants")
-                    .update()
-                    .eq("id", productId)
-                    .maybeSingle();
-
-            if (fetchError) {
-                throw new Error("An error occured while retrieving product");
-            }
-
-            if (!product) {
-                throw new NotFoundException("Product does not exist");
-            }
-
-            const variantExists = product.variants.some(
-                v => v.id === variantId
-            );
-            if (!variantExists) {
-                throw new NotFoundException("Variant does not exist");
-            }
-
-            // Delete variant
-            const { data: updatedProduct, error: updateError } =
-                await this.supabase
-                    .from("Products")
-                    .update({
-                        variants: product.variants.filter(
-                            v => v.id !== variantId
-                        ),
-                        updated_at: new Date()
-                    })
-                    .eq("id", productId)
+                    .delete()
+                    .match({ product_id: productId, id: variantId })
                     .select();
 
-            if (updateError) {
-                throw new Error(
-                    "An error occured while deleting product variant"
-                );
+            if (deleteError) {
+                throw new Error("An error occured while deleting product");
             }
 
-            return updatedProduct; // Return the updated product
+            if (!deletedProductVariant) {
+                throw new NotFoundException("Product variant does not exist");
+            }
+
+            return deletedProductVariant; // Return the deleted product variant
         } catch (error) {
             if (error instanceof BadRequestException) {
                 throw error;
@@ -330,10 +364,10 @@ export class ProductsService {
         }
     }
 
-    // Method -- Post
+    // Method -- Delete
     // Access -- Private
-    // Function:  A function to create a product variant
-    // Returns: The variant product or throws an error
+    // Function:  A function to delete a product variant
+    // Returns: The deleted variant product or throws an error
     async addProductVariant(productId: string, variant: Variant) {
         try {
             // Validates if product id is valid
