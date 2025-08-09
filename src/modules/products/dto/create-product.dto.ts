@@ -1,66 +1,84 @@
 import {
-  IsString,
-  IsNotEmpty,
-  IsArray,
-  IsNumber,
-  IsObject,
-} from 'class-validator';
+    IsString,
+    IsNotEmpty,
+    IsArray,
+    IsNumber,
+    IsObject,
+    IsUrl,
+    IsOptional
+} from "class-validator";
 export class CreateProductDto {
-  @IsString()
-  @IsNotEmpty()
-  store_id: string;
+    @IsString()
+    @IsNotEmpty()
+    store_id: string;
 
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+    @IsString()
+    @IsNotEmpty()
+    name: string;
 
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
+    @IsString()
+    @IsNotEmpty()
+    slug: string;
 
-  @IsString()
-  @IsNotEmpty()
-  category: string;
+    @IsString()
+    @IsNotEmpty()
+    category: string;
 
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+    @IsString()
+    @IsNotEmpty()
+    description: string;
 
-  @IsArray()
-  @IsNotEmpty()
-  variants: Variant[];
+    @IsNumber()
+    @IsNotEmpty()
+    price: number;
+
+    @IsUrl()
+    @IsNotEmpty()
+    thumbnail: string;
+
+    @IsArray()
+    @IsNotEmpty()
+    tags: string[];
+
+    @IsOptional()
+    @IsObject()
+    attributes: Record<string, any>;
 }
 
 export class Variant {
-  @IsString()
-  @IsNotEmpty()
-  id: string;
+    @IsString()
+    @IsNotEmpty()
+    product_id: string;
 
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+    @IsString()
+    @IsNotEmpty()
+    color: string;
 
-  @IsString()
-  @IsNotEmpty()
-  sku: string;
+    @IsString()
+    @IsNotEmpty()
+    size: string;
 
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+    @IsString()
+    @IsNotEmpty()
+    weight: string;
 
-  @IsNumber()
-  @IsNotEmpty()
-  price: number;
+    @IsString()
+    @IsNotEmpty()
+    dimensions: string;
 
-  @IsObject()
-  @IsNotEmpty()
-  attributes: Record<string, any>;
+    @IsNumber()
+    @IsNotEmpty()
+    stock_quantity: number;
 
-  @IsNumber()
-  @IsNotEmpty()
-  stock: number;
+    @IsUrl()
+    @IsNotEmpty()
+    image_url: string;
 
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
+    @IsString()
+    @IsNotEmpty()
+    sku: string;
+
+    @IsNumber()
+    @IsNotEmpty()
+    price: number;
 }
