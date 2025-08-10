@@ -357,17 +357,18 @@ export class ProductsService {
         throw new NotFoundException('Product does not exist');
       }
 
-      const { data: duplicates } = await this.supabase
-        .from('products variants')
-        .select('*')
-        .eq('product_id', productId);
+      // const { data: duplicates } = await this.supabase
+      //   .from('products variants')
+      //   .select('*')
+      //   .eq('product_id', productId);
 
-      for (const duplicate of duplicates) {
-        await this.supabase
-          .from('products variants')
-          .delete()
-          .match({ product_id: duplicate.id }); // careful: deletes ALL with that id
-      }
+      // for (const duplicate of duplicates) {
+      //   await this.supabase
+      //     .from('products variants')
+      //     .delete()
+      //     .match({ product_id: duplicate.id }); // careful: deletes ALL with that id
+      // }
+
       return { message: 'Product deleted successfully' };
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -688,6 +689,4 @@ export class ProductsService {
       );
     }
   }
-
-  async checkItemExists(table: string, query: Record<string, any>) {}
 }

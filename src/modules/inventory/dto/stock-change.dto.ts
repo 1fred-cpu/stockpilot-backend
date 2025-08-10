@@ -2,11 +2,11 @@
 import { IsUUID, IsInt, IsString, IsOptional } from 'class-validator';
 
 export class StockChangeDto {
-  @IsUUID() inventory_id: string;
+  @IsUUID() inventoryId: string;
   @IsInt() change: number;
   @IsString() type: string;
   @IsOptional() @IsString() reason?: string;
-  @IsOptional() @IsUUID() reference_id?: string;
-  @IsOptional() @IsString() idempotency_key?: string;
-  @IsOptional() @IsUUID() created_by?: string;
+  @IsOptional() @IsUUID() referenceId?: string;
+  @IsString() idempotencyKey: string;
+  @IsOptional() @IsUUID() userId?: string;
 }
