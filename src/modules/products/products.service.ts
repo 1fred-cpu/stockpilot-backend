@@ -34,39 +34,82 @@ export class ProductsService {
         throw new BadRequestException('Invalid store ID provided');
       }
       // Check if the product already exists in products
-      const { data, error } = await this.supabase
+      const { data: productExists, error: fetchError } = await this.supabase
         .from('products')
         .select('*')
         .match({
           name: createProductDto.name,
           store_id: createProductDto.store_id,
-          slug: createProductDto.slug,
+          sku: createProductDto.sku,
         })
         .maybeSingle();
 
       // If an error occurs or data is found, throw an error
-      if (error) {
-        throw new Error('An error occured while checking product existence');
+      if (fetchError) {
+        throw new Error(
+          fetchError.message ??
+            'An error occured while checking product existence',
+        );
       }
 
-      if (data) {
+      if (productExists) {
         throw new ConflictException('Product already exists');
       }
 
-      // Generate slug for the product
-      createProductDto.slug = generateSlug(createProductDto.name);
-
       // Create  new product
+      const newProduct = {
+        name: createProductDto.name,
+        brand: createProductDto.brand,
+        price: createProductDto.price,
+        sku: createProductDto.sku,
+        color: createProductDto.color,
+        size: createProductDto.size,
+        weight: createProductDto.weight,
+        dimensions: createProductDto.dimensions,
+        attributes: createProductDto.attributes
+          ? createProductDto.attributes
+          : null,
+        tags: createProductDto.tags,
+        category: createProductDto.category,
+        description: createProductDto.description,
+        store_id: createProductDto.store_id,
+        slug: generateSlug(createProductDto.name),
+      };
       const { data: createdProduct, error: createError } = await this.supabase
         .from('products')
-        .insert([createProductDto])
+        .insert([newProduct])
         .select();
 
       if (createError) {
-        throw new Error('An error occured while creating product');
+        throw new Error(
+          createError.message || 'An error occured while creating product',
+        );
       }
 
-      return createdProduct[0]; // Return the created product
+      // Create a inventory item of the product
+      const { data: productInventory, error } = await this.supabase
+        .from('inventories')
+        .insert([
+          {
+            product_id: createdProduct[0].id,
+            variant_id: null,
+            stock: createProductDto.stock,
+            low_stock_threshold: createProductDto.low_stock_threshold,
+          },
+        ])
+        .select();
+
+      if (error) {
+        throw new BadRequestException(error.message);
+      }
+
+      const { data: updatedProduct, updateError } = await this.supabase
+        .from('products')
+        .update({ inventory_id: createdProduct[0].id })
+        .eq('id', createdProduct[0].id)
+        .select();
+
+      return { updatedProduct, productInventory }; // Return the created product
     } catch (error) {
       if (error instanceof ConflictException) {
         throw error;
@@ -502,7 +545,7 @@ export class ProductsService {
         await this.supabase
           .from('products variants')
           .select('*')
-          .match({ product_id: productId, sku: variant.sku })
+          .match({ sku: variant.sku })
           .maybeSingle();
 
       if (fetchError) {
@@ -514,9 +557,19 @@ export class ProductsService {
       }
 
       // Create variant
-      const { data: product, error: createError } = await this.supabase
+
+      const newVariant = {
+        product_id: variant.product_id,
+        sku: variant.sku,
+        color: variant.color,
+        size: variant.size,
+        price: variant.price,
+        image_url: variant.image_url,
+        dimensions: variant.dimensions,
+      };
+      const { data: productVariant, error: createError } = await this.supabase
         .from('products variants')
-        .insert([{ ...variant, product_id: productId }])
+        .insert([newVariant])
         .select();
 
       if (createError) {
@@ -526,7 +579,36 @@ export class ProductsService {
         );
       }
 
-      return product; // Return the updated product
+      // Create a inventory for the variant
+      const { data: variantInventory, error } = await this.supabase
+        .from('inventories')
+        .insert([
+          {
+            product_id: productId,
+            variant_id: productVariant[0].id,
+            stock: variant.stock,
+            reserved: variant.reserved ?? 0,
+            low_stock_threshold: variant.low_stock_threshold,
+          },
+        ])
+        .select();
+
+      if (error) {
+        throw new BadRequestException(error.message);
+      }
+
+      // update the inventory id for the variant
+      const { data: updatedVariant, error: updateError } = await this.supabase
+        .from('products variants')
+        .update({ inventory_id: variantInventory[0].id })
+        .eq('id', productVariant[0].id)
+        .select();
+
+      if (updateError) {
+        throw new BadRequestException(updateError.message);
+      }
+
+      return { updatedVariant, variantInventory }; // Return the updated product
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -606,4 +688,6 @@ export class ProductsService {
       );
     }
   }
+
+  async checkItemExists(table: string, query: Record<string, any>) {}
 }
