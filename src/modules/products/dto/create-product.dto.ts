@@ -10,7 +10,7 @@ import {
 export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
-  store_id: string;
+  storeId: string;
 
   @IsString()
   @IsNotEmpty()

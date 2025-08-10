@@ -51,7 +51,7 @@ export class InventoryService {
             .from('inventories')
             .select('stock')
             .eq('id', inventoryId)
-            .single();
+            .maybeSingle();
 
           if (invError) throw new BadRequestException(invError.message);
           return { newStock: inv.stock, alertCreated: false };
@@ -67,7 +67,9 @@ export class InventoryService {
 
       if (invFetchError) throw new BadRequestException(invFetchError.message);
       if (!inventory)
-        throw new NotFoundException(`Inventory ${inventoryId} not found`);
+        throw new NotFoundException(
+          `Inventory with id ${inventoryId} not found`,
+        );
 
       let {
         stock,
@@ -186,6 +188,7 @@ export class InventoryService {
       return { newStock, alertCreated };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
+      else if (error instanceof NotFoundException) throw error;
       this.logger.error('Error processing stock move', error);
       throw new InternalServerErrorException(
         'An error occurred while processing the stock move',

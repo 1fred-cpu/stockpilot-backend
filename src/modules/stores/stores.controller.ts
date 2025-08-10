@@ -11,7 +11,6 @@ import {
 import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
-import { Throttle } from '@nestjs/throttler';
 @Controller('stores')
 export class StoresController {
   constructor(private readonly storesService: StoresService) {}
@@ -21,21 +20,16 @@ export class StoresController {
     return this.storesService.createStore(createStoreDto);
   }
 
-  @Get(':store_id')
-  async findStore(@Param('store_id') store_id: string) {
-    return this.storesService.findStore(store_id);
+  @Get(':storeId')
+  async findStore(@Param('storeId') storeId: string) {
+    return this.storesService.findStore(storeId);
   }
 
-  @Patch(':store_id')
+  @Patch(':storeId')
   async updateStore(
-    @Param('store_id') store_id: string,
+    @Param('storeId') storeId: string,
     @Body() updateStoreDto: UpdateStoreDto,
   ) {
-    return this.storesService.updateStore(store_id, updateStoreDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.storesService.remove(+id);
+    return this.storesService.updateStore(storeId, updateStoreDto);
   }
 }

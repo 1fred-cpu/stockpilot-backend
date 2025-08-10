@@ -5,10 +5,11 @@ import {
   IsEmail,
   IsPhoneNumber,
   IsUrl,
+  IsUUID,
 } from 'class-validator';
 
 export class CreateStoreDto {
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   owner_id: string;
 
@@ -31,8 +32,6 @@ export class CreateStoreDto {
   contact_phone: string;
 
   @IsUrl()
-  @IsString()
-  @IsNotEmpty()
   logo_url: string;
 
   @IsString()

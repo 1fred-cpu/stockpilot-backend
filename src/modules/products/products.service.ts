@@ -26,29 +26,28 @@ export class ProductsService {
   // Returns: A created product or throws an error if the product already exists
   async createProduct(createProductDto: CreateProductDto) {
     try {
-      // Validate store id if is valid
-      const isStoreIdValid = isValidUUID(createProductDto.store_id);
+      // Validate store ID if is valid
+      const isStoreIdValid = isValidUUID(createProductDto.storeId);
 
-      // Throws an error if store id is not valid
+      // Throws an error if store ID is not valid
       if (!isStoreIdValid) {
         throw new BadRequestException('Invalid store ID provided');
       }
       // Check if the product already exists in products
-      const { data: productExists, error: fetchError } = await this.supabase
+      const { data: productExists, error: existsError } = await this.supabase
         .from('products')
         .select('*')
         .match({
           name: createProductDto.name,
-          store_id: createProductDto.store_id,
+          store_id: createProductDto.storeId,
           sku: createProductDto.sku,
         })
         .maybeSingle();
 
       // If an error occurs or data is found, throw an error
-      if (fetchError) {
-        throw new Error(
-          fetchError.message ??
-            'An error occured while checking product existence',
+      if (existsError) {
+        throw new BadRequestException(
+          `An error occured while checking product existence: ${existsError.message}`,
         );
       }
 
@@ -72,26 +71,29 @@ export class ProductsService {
         tags: createProductDto.tags,
         category: createProductDto.category,
         description: createProductDto.description,
-        store_id: createProductDto.store_id,
+        store_id: createProductDto.storeId,
+        image_url: createProductDto.image_url,
         slug: generateSlug(createProductDto.name),
       };
-      const { data: createdProduct, error: createError } = await this.supabase
+      const { data, error: createError } = await this.supabase
         .from('products')
         .insert([newProduct])
         .select();
 
       if (createError) {
-        throw new Error(
-          createError.message || 'An error occured while creating product',
+        throw new BadRequestException(
+          `An error occured while creating product ${createError.message}`,
         );
       }
 
-      // Create a inventory item of the product
-      const { data: productInventory, error } = await this.supabase
+      const createdProduct = data[0];
+
+      // Create a inventory item for the product
+      const { data: inventoryData, inventoryError } = await this.supabase
         .from('inventories')
         .insert([
           {
-            product_id: createdProduct[0].id,
+            product_id: createdProduct.id,
             variant_id: null,
             stock: createProductDto.stock,
             low_stock_threshold: createProductDto.low_stock_threshold,
@@ -99,17 +101,27 @@ export class ProductsService {
         ])
         .select();
 
-      if (error) {
-        throw new BadRequestException(error.message);
+      if (inventoryError) {
+        throw new BadRequestException(
+          `An error occured while creating inventory item: ${inventoryError.message}`,
+        );
       }
+
+      const productInventory = inventoryData[0];
 
       const { data: updatedProduct, updateError } = await this.supabase
         .from('products')
-        .update({ inventory_id: createdProduct[0].id })
-        .eq('id', createdProduct[0].id)
+        .update({ inventory_id: createdProduct.id })
+        .eq('id', createdProduct.id)
         .select();
 
-      return { updatedProduct, productInventory }; // Return the created product
+      if (updateError) {
+        throw new BadRequestException(
+          `An error occured while updating product: ${updateError.message}`,
+        );
+      }
+
+      return { product: updatedProduct[0], inventory: productInventory }; // Return the created product and inventory
     } catch (error) {
       if (error instanceof ConflictException) {
         throw error;
@@ -140,15 +152,17 @@ export class ProductsService {
         throw new BadRequestException('Invalid product ID');
       }
       // Find product with id
-      const { data: product, error } = await this.supabase
+      const { data: product, error: fetchError } = await this.supabase
         .from('products')
         .select('*')
         .eq('id', productId)
         .maybeSingle();
 
       // If an error occurs  throw an error
-      if (error) {
-        throw new Error('An error occured while retrieving product');
+      if (fetchError) {
+        throw new BadRequestException(
+          `An error occured while retrieving product: ${fetchError.message}`,
+        );
       }
 
       if (!product) {
@@ -161,8 +175,6 @@ export class ProductsService {
         throw error;
       } else if (error instanceof BadRequestException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error retrieving product: ', error.message);
@@ -236,11 +248,13 @@ export class ProductsService {
       const { data: products, error: fetchError } = await supabaseQuery;
 
       if (fetchError) {
-        throw new Error('An error occurred while fetching products');
+        throw new BadRequestException(
+          `An error occurred while fetching products: ${fetchError.message}`,
+        );
       }
 
       if (!products || products.length === 0) {
-        throw new NotFoundException('No products found for this store');
+        throw new NotFoundException('No products found');
       }
 
       return products;
@@ -249,8 +263,6 @@ export class ProductsService {
         throw error;
       } else if (error instanceof BadRequestException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error retrieving products: ', error.message);
@@ -266,7 +278,7 @@ export class ProductsService {
   // Returns: The updated product or throws an error if the product does not exist
   async updateProduct(productId: string, updateProductDto: UpdateProductDto) {
     try {
-      // Validate product id if is valid
+      // Validate product ID if is valid
       const isProductIdValid = isValidUUID(productId);
 
       if (!isProductIdValid) {
@@ -280,7 +292,9 @@ export class ProductsService {
         .maybeSingle();
 
       if (fetchError) {
-        throw new Error('An error occured while retrieving product');
+        throw new BadRequestException(
+          `An error occured while retrieving product: ${fetchError.message}`,
+        );
       }
 
       if (!product) {
@@ -292,17 +306,12 @@ export class ProductsService {
         ? generateSlug(updateProductDto.name)
         : product.slug;
 
-      // update tags if tags need to be changed
-      const updatedTags = Array.from(
-        new Set([...(product.tags ?? []), ...(updateProductDto.tags ?? [])]),
-      );
       // Find product and update with id
       const { data: updatedProduct, error: updateError } = await this.supabase
         .from('products')
         .update({
           ...updateProductDto,
           slug: updatedSlug,
-          tags: updatedTags,
           updated_at: new Date(),
         })
         .eq('id', productId)
@@ -313,14 +322,12 @@ export class ProductsService {
         throw new Error('An error occured while updating product');
       }
 
-      return updatedProduct; // Return the found product
+      return updatedProduct[0]; // Return the found product
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       } else if (error instanceof NotFoundException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error updating product: ', error.message);
@@ -342,7 +349,7 @@ export class ProductsService {
       if (!isProductIdValid) {
         throw new BadRequestException('Invalid product ID');
       }
-      // Find product with product id
+      // Find and delete product with product id
       const { data: product, error: deleteError } = await this.supabase
         .from('products')
         .delete()
@@ -350,7 +357,9 @@ export class ProductsService {
         .select();
 
       if (deleteError) {
-        throw new Error('An error occured while deleting product');
+        throw new BadRequestException(
+          `An error occured while deleting product: ${deleteError.message}`,
+        );
       }
 
       if (!product) {
@@ -375,8 +384,6 @@ export class ProductsService {
         throw error;
       } else if (error instanceof NotFoundException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error deleting product: ', error.message);
@@ -411,7 +418,9 @@ export class ProductsService {
         .maybeSingle();
 
       if (checkError) {
-        throw new Error('An error occured while retrieving product');
+        throw new BadRequestException(
+          `An error occured while retrieving product ${checkError.message}`,
+        );
       }
 
       if (!productExists) {
@@ -434,14 +443,12 @@ export class ProductsService {
         throw new NotFoundException('Product variant does not exist');
       }
 
-      return updatedProductVariant; // Return the updated product variant
+      return updatedProductVariant[0]; // Return the updated product variant
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       } else if (error instanceof NotFoundException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error updating product variant: ', error.message);
@@ -472,7 +479,9 @@ export class ProductsService {
         .maybeSingle();
 
       if (checkError) {
-        throw new Error('An error occured while retrieving product');
+        throw new BadRequestException(
+          'An error occured while retrieving product',
+        );
       }
 
       if (!productExists) {
@@ -488,21 +497,21 @@ export class ProductsService {
           .select();
 
       if (deleteError) {
-        throw new Error('An error occured while deleting product');
+        throw new Error(
+          `An error occured while deleting product ${deleteError.message}`,
+        );
       }
 
       if (deletedProductVariant.length === 0) {
         throw new NotFoundException('Product variant does not exist');
       }
 
-      return deletedProductVariant; // Return the deleted product variant
+      return deletedProductVariant[0]; // Return the deleted product variant
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       } else if (error instanceof NotFoundException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error deleting product variant: ', error.message);
@@ -534,7 +543,9 @@ export class ProductsService {
         .maybeSingle();
 
       if (checkError) {
-        throw new Error('An error occured while retrieving product');
+        throw new Error(
+          `An error occured while retrieving product ${checkError.message}`,
+        );
       }
 
       if (!productExists) {
@@ -550,7 +561,9 @@ export class ProductsService {
           .maybeSingle();
 
       if (fetchError) {
-        throw new Error('An error occured while retrieving product variant');
+        throw new BadRequestException(
+          `An error occured while retrieving product variant ${fetchError.message}`,
+        );
       }
 
       if (productVariantExists) {
@@ -565,6 +578,7 @@ export class ProductsService {
         color: variant.color,
         size: variant.size,
         price: variant.price,
+        weight: variant.weight,
         image_url: variant.image_url,
         dimensions: variant.dimensions,
       };
@@ -574,9 +588,8 @@ export class ProductsService {
         .select();
 
       if (createError) {
-        throw new Error(
-          createError.message ??
-            'An error occured while creating product variant',
+        throw new BadRequestException(
+          `An error occured while creating product variant ${createError.message}`,
         );
       }
 
@@ -609,14 +622,12 @@ export class ProductsService {
         throw new BadRequestException(updateError.message);
       }
 
-      return { updatedVariant, variantInventory }; // Return the updated product
+      return { variant: updatedVariant[0], inventory: variantInventory[0] }; // Return the created variant
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       } else if (error instanceof ConflictException) {
         throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
       }
       // Logs error to the  console
       this.logger.error('Error creating product variant: ', error.message);

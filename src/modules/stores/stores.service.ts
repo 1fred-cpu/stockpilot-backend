@@ -67,30 +67,32 @@ export class StoresService {
   // Access -- Private
   // Function:  A function to find store
   // Returns: The store to the client if found or throws an error if not found
-  async findStore(store_id: string) {
+  async findStore(storeId: string) {
     try {
-      // Validate the format of store_id if it matches uuid format
-      const isStoreIdValid = isValidUUID(store_id);
+      // Validate the format of store ID if it matches uuid format
+      const isStoreIdValid = isValidUUID(storeId);
       if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of store_id');
+        throw new BadRequestException('Invalid format of srore ID');
       }
 
-      // Find a store with store_id
-      const { data, error } = await this.supabase
+      // Find a store with store ID
+      const { data: store, error: fetchError } = await this.supabase
         .from('stores')
         .select('*')
-        .eq('store_id', store_id)
+        .eq('id', storeId)
         .maybeSingle();
 
       // If an error occurs while finding store throw an error
-      if (error) {
-        throw new Error('An error occured while  finding store');
+      if (fetchError) {
+        throw new BadRequestException(
+          `Error finding store existence: ${fetchError.message}`,
+        );
       }
-      if (!data) {
-        throw new NotFoundException('Store not found');
+      if (!store) {
+        throw new NotFoundException("Store does'nt not exists");
       }
       // Returns data to client
-      return data;
+      return store;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -102,7 +104,7 @@ export class StoresService {
       // Logs error to the  console
       this.logger.error('Error finding store: ', error.message);
       throw new InternalServerErrorException(
-        'An unexpected error occurred while finding  store',
+        'An unexpected error occurred while finding store',
       );
     }
   }
@@ -113,32 +115,34 @@ export class StoresService {
   /* Returns: Update the store if found and return updated store or throwa an
     error if not found */
 
-  async updateStore(store_id: string, updateStoreDto: UpdateStoreDto) {
+  async updateStore(storeId: string, updateStoreDto: UpdateStoreDto) {
     try {
       // Validate the format of store_id if it matches uuid format
-      const isStoreIdValid = isValidUUID(store_id);
+      const isStoreIdValid = isValidUUID(storeId);
       if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of store_id');
+        throw new BadRequestException('Invalid format of store ID');
       }
 
-      // Find and update a store with store_id
-      const { data, error } = await this.supabase
+      // Find and update a store with store ID
+      const { data, error: updateError } = await this.supabase
         .from('stores')
-        .update(updateStoreDto)
-        .eq('store_id', store_id)
+        .update({ ...updateStoreDto, updated_at: new Date().toISOString() })
+        .eq('id', storeId)
         .select();
 
+      const updatedProduct = data[0];
+
       // If an error occurs while updating store throw an error
-      if (error) {
-        throw new Error(
-          error.message || 'An error occured while  updating store',
+      if (updateError) {
+        throw new BadRequestException(
+          `An error occured while updating store: ${updateError.message}`,
         );
       }
-      if (data.length === 0) {
-        throw new NotFoundException('Store not found');
+      if (!updatedProduct) {
+        throw new NotFoundException("Store does'nt exists");
       }
       // Return updated data to client
-      return data;
+      return updatedProduct;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -161,28 +165,29 @@ export class StoresService {
   /* Returns: Delete the store if found and return deleted store or throwa an
     error if not found */
 
-  async deleteStore(store_id: string) {
+  async deleteStore(storeId: string) {
     try {
       // Validate the format of store_id if it matches uuid format
-      const isStoreIdValid = isValidUUID(store_id);
+      const isStoreIdValid = isValidUUID(storeId);
       if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of store_id');
+        throw new BadRequestException('Invalid format of store ID');
       }
 
       // Find and delete a store with store_id
-      const { data, error } = await this.supabase
+      const { data, error: deleteError } = await this.supabase
         .from('stores')
         .delete()
-        .eq('store_id', store_id)
+        .eq('id', storeId)
         .select();
 
+      const deletedStore = data[0];
       // If an error occurs while deleting store throw an error
-      if (error) {
+      if (deleteError) {
         throw new Error(
-          error.message || 'An error occured while  deleting store',
+          `An error occured while deleting store ${deleteError.message}`,
         );
       }
-      if (data.length === 0) {
+      if (!deletedStore) {
         throw new NotFoundException('Store not found');
       }
       // Return a message  to client
@@ -201,17 +206,5 @@ export class StoresService {
         'An unexpected error occurred while deleting store',
       );
     }
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} store`;
-  }
-
-  update(id: number, updateStoreDto: UpdateStoreDto) {
-    return `This action updates a #${id} store`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} store`;
   }
 }
