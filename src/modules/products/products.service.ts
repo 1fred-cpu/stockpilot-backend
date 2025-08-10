@@ -12,6 +12,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { isValidUUID } from '../../../utils/id-validator';
 import { generateSlug } from 'utils/slug-generator';
 import { v4 as uuidv4 } from 'uuid';
+import { Filter } from 'types/filter';
 @Injectable()
 export class ProductsService {
   private logger = new Logger(ProductsService.name);
@@ -34,7 +35,7 @@ export class ProductsService {
       }
       // Check if the product already exists in products
       const { data, error } = await this.supabase
-        .from('Products')
+        .from('products')
         .select('*')
         .match({
           name: createProductDto.name,
@@ -57,7 +58,7 @@ export class ProductsService {
 
       // Create  new product
       const { data: createdProduct, error: createError } = await this.supabase
-        .from('Products')
+        .from('products')
         .insert([createProductDto])
         .select();
 
@@ -97,7 +98,7 @@ export class ProductsService {
       }
       // Find product with id
       const { data: product, error } = await this.supabase
-        .from('Products')
+        .from('products')
         .select('*')
         .eq('id', productId)
         .maybeSingle();
@@ -134,9 +135,10 @@ export class ProductsService {
   // Returns: A found products for a store or throws an error if the product does not exist
   async getProducts(
     storeId: string,
-    filter?: 'bestseller' | 'trending' | 'featured' | 'new',
+    filter?: Filter,
     limit = 10,
     sort: 'asc' | 'desc' = 'desc',
+    category?: string,
   ) {
     try {
       // Validate store id if is valid
@@ -148,7 +150,7 @@ export class ProductsService {
       }
 
       let supabaseQuery = this.supabase
-        .from('Products')
+        .from('products')
         .select('*')
         .match({ store_id: storeId });
 
@@ -172,12 +174,16 @@ export class ProductsService {
           case 'trending':
             supabaseQuery = supabaseQuery.eq('is_trending', true);
             break;
+          case 'category':
+            supabaseQuery = supabaseQuery.eq('category', filter);
+            break;
           default:
             throw new BadRequestException('Invalid filter type');
         }
       }
 
-      if (supabaseQuery) {
+      if (!filter && category) {
+        supabaseQuery = supabaseQuery.eq('category', category);
       }
       // Sorting and limiting
       supabaseQuery = supabaseQuery
@@ -225,7 +231,7 @@ export class ProductsService {
       }
       // Find product with product id
       const { data: product, error: fetchError } = await this.supabase
-        .from('Products')
+        .from('products')
         .select('*')
         .eq('id', productId)
         .maybeSingle();
@@ -249,7 +255,7 @@ export class ProductsService {
       );
       // Find product and update with id
       const { data: updatedProduct, error: updateError } = await this.supabase
-        .from('Products')
+        .from('products')
         .update({
           ...updateProductDto,
           slug: updatedSlug,
@@ -295,7 +301,7 @@ export class ProductsService {
       }
       // Find product with product id
       const { data: product, error: deleteError } = await this.supabase
-        .from('Products')
+        .from('products')
         .delete()
         .eq('id', productId)
         .select();
@@ -309,13 +315,13 @@ export class ProductsService {
       }
 
       const { data: duplicates } = await this.supabase
-        .from('Products variants')
+        .from('products variants')
         .select('*')
         .eq('product_id', productId);
 
       for (const duplicate of duplicates) {
         await this.supabase
-          .from('Products variants')
+          .from('products variants')
           .delete()
           .match({ product_id: duplicate.id }); // careful: deletes ALL with that id
       }
@@ -353,10 +359,25 @@ export class ProductsService {
         throw new BadRequestException('Invalid product or variant ID');
       }
 
+      // Check if product exist
+      const { data: productExists, error: checkError } = await this.supabase
+        .from('products')
+        .select('*')
+        .match({ id: productId })
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!productExists) {
+        throw new NotFoundException('Product does not exist');
+      }
+
       // Find and update product variant
       const { data: updatedProductVariant, error: updateError } =
         await this.supabase
-          .from('Products variants')
+          .from('products variants')
           .update({ ...updateVariantDto, updated_at: new Date() })
           .match({ product_id: productId, id: variantId })
           .select();
@@ -365,7 +386,7 @@ export class ProductsService {
         throw new Error('An error occured while updating product variant');
       }
 
-      if (!updatedProductVariant) {
+      if (updatedProductVariant.length === 0) {
         throw new NotFoundException('Product variant does not exist');
       }
 
@@ -399,10 +420,25 @@ export class ProductsService {
         throw new BadRequestException('Invalid product or variant ID');
       }
 
+      // Check if product exist
+      const { data: productExists, error: checkError } = await this.supabase
+        .from('products')
+        .select('*')
+        .match({ id: productId })
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!productExists) {
+        throw new NotFoundException('Product does not exist');
+      }
+
       // Find and delete product variant
       const { data: deletedProductVariant, error: deleteError } =
         await this.supabase
-          .from('Products variants')
+          .from('products variants')
           .delete()
           .match({ product_id: productId, id: variantId })
           .select();
@@ -411,7 +447,7 @@ export class ProductsService {
         throw new Error('An error occured while deleting product');
       }
 
-      if (!deletedProductVariant) {
+      if (deletedProductVariant.length === 0) {
         throw new NotFoundException('Product variant does not exist');
       }
 
@@ -446,10 +482,25 @@ export class ProductsService {
         throw new BadRequestException('Invalid product ID');
       }
 
+      // Check if product exist
+      const { data: productExists, error: checkError } = await this.supabase
+        .from('products')
+        .select('*')
+        .match({ id: productId })
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!productExists) {
+        throw new NotFoundException('Product does not exist');
+      }
+
       // Check if a product variant exist
       const { data: productVariantExists, error: fetchError } =
         await this.supabase
-          .from('Products variants')
+          .from('products variants')
           .select('*')
           .match({ product_id: productId, sku: variant.sku })
           .maybeSingle();
@@ -464,12 +515,15 @@ export class ProductsService {
 
       // Create variant
       const { data: product, error: createError } = await this.supabase
-        .from('Products variants')
+        .from('products variants')
         .insert([{ ...variant, product_id: productId }])
         .select();
 
       if (createError) {
-        throw new Error('An error occured while creating product variant');
+        throw new Error(
+          createError.message ??
+            'An error occured while creating product variant',
+        );
       }
 
       return product; // Return the updated product
@@ -485,6 +539,70 @@ export class ProductsService {
       this.logger.error('Error creating product variant: ', error.message);
       throw new InternalServerErrorException(
         'An unexpected error occurred while creating the product variant',
+      );
+    }
+  }
+
+  // Method -- Get
+  // Access -- Private
+  // Function:  A function to get all product variants
+  // Returns: The  variants of a  product or throws an error
+  async getProductVariants(productId: string) {
+    try {
+      // Validates if product id is valid
+      const isProductIdValid = isValidUUID(productId);
+
+      // Throws an error if not
+      if (!isProductIdValid) {
+        throw new BadRequestException('Invalid product ID');
+      }
+
+      // Check if product exist
+      const { data: productExists, error: checkError } = await this.supabase
+        .from('products')
+        .select('*')
+        .match({ id: productId })
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error('An error occured while retrieving product');
+      }
+
+      if (!productExists) {
+        throw new NotFoundException('Product does not exist');
+      }
+
+      // Find product variants
+      const { data: productVariants, error: fetchError } = await this.supabase
+        .from('products variants')
+        .select('*')
+        .match({ product_id: productId })
+        .select();
+
+      if (fetchError) {
+        throw new Error(
+          fetchError.message ??
+            'An error occured while retrieving product variant',
+        );
+      }
+
+      if (productVariants.length === 0) {
+        throw new NotFoundException('Product variants does not exist');
+      }
+
+      return productVariants;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      } else if (error instanceof Error) {
+        throw new InternalServerErrorException(error.message);
+      }
+      // Logs error to the  console
+      this.logger.error('Error retrieving product variants: ', error.message);
+      throw new InternalServerErrorException(
+        'An unexpected error occurred while retrieving the product variants',
       );
     }
   }
