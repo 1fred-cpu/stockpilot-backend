@@ -1,86 +1,90 @@
 import {
-    IsString,
-    IsNotEmpty,
-    IsArray,
-    IsNumber,
-    IsObject,
-    IsUrl,
-    IsOptional
-} from "class-validator";
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsNumber,
+  IsObject,
+  IsUrl,
+  IsOptional,
+} from 'class-validator';
 export class CreateProductDto {
-    @IsString()
-    @IsNotEmpty()
-    storeId: string;
+  @IsString()
+  @IsNotEmpty()
+  storeId: string;
 
-    @IsString()
-    @IsNotEmpty()
-    name: string;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsString()
-    @IsNotEmpty()
-    brand: string;
+  @IsString()
+  @IsNotEmpty()
+  brand: string;
 
-    @IsString()
-    @IsNotEmpty()
-    category: string;
+  @IsString()
+  @IsNotEmpty()
+  category: string;
 
-    @IsString()
-    @IsNotEmpty()
-    description: string;
+  @IsString()
+  @IsNotEmpty()
+  description: string;
 
-    @IsUrl()
-    thumbnail: string;
+  @IsUrl()
+  thumbnail: string;
 
-    @IsArray()
-    @IsNotEmpty()
-    tags: string[];
+  @IsArray()
+  @IsNotEmpty()
+  tags: string[];
 
-    @IsOptional()
-    @IsObject()
-    attributes: Record<string, any>;
+  @IsOptional()
+  @IsObject()
+  attributes: Record<string, any>;
 
-    @IsArray()
-    variants: Variant[];
+  @IsArray()
+  variants: Variant[];
 }
 
 export class Variant {
-    @IsOptional()
-    @IsString()
-    @IsNotEmpty()
-    product_id: string;
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  product_id: string;
 
-    @IsUrl()
-    image_url: string;
+  @IsUrl()
+  image_url: string;
 
-    @IsString()
-    @IsNotEmpty()
-    color: string;
+  @IsString()
+  @IsNotEmpty()
+  color: string;
 
-    @IsString()
-    @IsNotEmpty()
-    size: string;
+  @IsString()
+  @IsNotEmpty()
+  size: string;
 
-    @IsString()
-    @IsNotEmpty()
-    weight: string;
+  @IsString()
+  @IsNotEmpty()
+  weight: string;
 
-    @IsString()
-    @IsNotEmpty()
-    dimensions: string;
+  @IsString()
+  @IsNotEmpty()
+  dimensions: string;
 
-    @IsNumber()
-    @IsNotEmpty()
-    stock: number;
+  @IsNumber()
+  @IsNotEmpty()
+  stock: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    low_stock_threshold: number;
+  @IsNumber()
+  @IsNotEmpty()
+  price: number;
 
-    @IsUrl()
-    @IsNotEmpty()
-    image_url: string;
+  @IsNumber()
+  @IsNotEmpty()
+  low_stock_threshold: number;
 
-    @IsString()
-    @IsNotEmpty()
-    sku: string;
+  @IsNumber()
+  @IsNotEmpty()
+  reserved: number;
+
+  @IsString()
+  @IsNotEmpty()
+  sku: string;
 }
