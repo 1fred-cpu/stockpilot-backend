@@ -1,239 +1,249 @@
 import {
-    Injectable,
-    Inject,
-    Logger,
-    BadRequestException,
-    NotFoundException,
-    InternalServerErrorException
-} from "@nestjs/common";
-import { CreateSaleDto } from "./dto/create-sale.dto";
-import { UpdateSaleDto } from "./dto/update-sale.dto";
-import { isValidUUID } from "../../../utils/id-validator";
-import { InventoryService } from "../inventory/inventory.service";
-import { Response } from "express";
+  Injectable,
+  Inject,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { CreateSaleDto } from './dto/create-sale.dto';
+import { UpdateSaleDto } from './dto/update-sale.dto';
+import { isValidUUID } from '../../../utils/id-validator';
+import { InventoryService } from '../inventory/inventory.service';
+import { Response } from 'express';
 
 @Injectable()
 export class SalesService {
-    private logger = new Logger(SalesService.name);
-    constructor(
-        @Inject("SUPABASE_CLIENT") private readonly supabase: any,
-        private readonly inventoryService: InventoryService
-    ) {}
-    async createSale(createSaleDto: CreateSaleDto) {
-        try {
-            // 1. Validate store ID
-            if (!isValidUUID(createSaleDto.store_id)) {
-                throw new BadRequestException("Invalid store ID format");
-            }
+  private logger = new Logger(SalesService.name);
+  constructor(
+    @Inject('SUPABASE_CLIENT') private readonly supabase: any,
+    private readonly inventoryService: InventoryService,
+  ) {}
+  async createSale(createSaleDto: CreateSaleDto) {
+    try {
+      // 1. Validate store ID
+      if (!isValidUUID(createSaleDto.store_id)) {
+        throw new BadRequestException('Invalid store ID format');
+      }
 
-            // 2. Check if store exists
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("*")
-                .eq("id", createSaleDto.store_id)
-                .maybeSingle();
+      // 2. Check if store exists
+      const { data: store, error: fetchError } = await this.supabase
+        .from('stores')
+        .select('*')
+        .eq('id', createSaleDto.store_id)
+        .maybeSingle();
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    `Error checking store existence: ${fetchError.message}`
-                );
-            }
-            if (!store) {
-                throw new NotFoundException("Store doesn't exist");
-            }
+      if (fetchError) {
+        throw new BadRequestException(
+          `Error checking store existence: ${fetchError.message}`,
+        );
+      }
+      if (!store) {
+        throw new NotFoundException("Store doesn't exist");
+      }
 
-            const createdSales:any[] = [];
+      const createdSales: any[] = [];
 
-            for (const sale of createSaleDto.sales) {
-                // 3. Validate idempotency key
-                if (!sale.idempotency_key) {
-                    throw new BadRequestException(
-                        "idempotency_key was not provided"
-                    );
-                }
-
-                // 4. Validate product exists and belongs to this store
-                const { data: product, error: productError } =
-                    await this.supabase
-                        .from("products")
-                        .select("id")
-                        .match({"id": sale.product_id,
-                        store_id : createSaleDto.store_id,
-                        })
-                        .maybeSingle();
-
-                if (productError) {
-                    throw new BadRequestException(
-                        `Error checking product existence: ${productError.message}`
-                    );
-                }
-                if (!product) {
-                    throw new NotFoundException(
-                        `Product with ID ${sale.product_id} not found in this store`
-                    );
-                }
-
-                // 5. Check idempotency key in stock movements
-                const { data: existingMovement, error: movError } =
-                    await this.supabase
-                        .from("stock movements")
-                        .select("id")
-                        .eq("idempotency_key", sale.idempotency_key)
-                        .maybeSingle();
-
-                if (movError) {
-                    throw new BadRequestException(
-                        `Error checking stock movement: ${movError.message}`
-                    );
-                }
-                if (existingMovement) {
-                    this.logger.warn(
-                        `Duplicate sale skipped: ${sale.idempotency_key}`
-                    );
-                    continue;
-                }
-
-                // 6. Create sale record
-                const { data: newSale, error: createError } =
-                    await this.supabase
-                        .from("sales")
-                        .insert({
-                            ...sale,
-                            store_id: createSaleDto.store_id,
-                            sale_date: new Date(createSaleDto.sale_date)
-                        })
-                        .select()
-                        .maybeSingle();
-
-                if (createError) {
-                    throw new BadRequestException(
-                        `Error creating sale record: ${createError.message}`
-                    );
-                }
-
-                // 7. Adjust stock
-                await this.inventoryService.stockMove({
-                    inventory_id: sale.inventory_id,
-                    change: -sale.quantity,
-                    type: sale.type,
-                    idempotency_key: sale.idempotency_key
-                });
-
-                createdSales.push(newSale);
-            }
-
-            return createdSales;
-        } catch (error) {
-            this.logger.error(`Oops an error occurred: ${error.message}`);
-            if (
-                error instanceof BadRequestException ||
-                error instanceof NotFoundException
-            ) {
-                throw error;
-            }
-            throw new InternalServerErrorException(
-                "An error occurred while creating sale record. Try again later"
-            );
+      for (const sale of createSaleDto.sales) {
+        // 3. Validate idempotency key
+        if (!sale.idempotency_key) {
+          throw new BadRequestException('idempotency_key was not provided');
         }
-    }
 
-async getSales(
+        // 4. Validate product exists and belongs to this store
+        const { data: product, error: productError } = await this.supabase
+          .from('products')
+          .select('id')
+          .match({ id: sale.product_id, store_id: createSaleDto.store_id })
+          .maybeSingle();
+
+        if (productError) {
+          throw new BadRequestException(
+            `Error checking product existence: ${productError.message}`,
+          );
+        }
+        if (!product) {
+          throw new NotFoundException(
+            `Product with ID ${sale.product_id} not found in this store`,
+          );
+        }
+
+        // 5. Check idempotency key in stock movements
+        const { data: existingMovement, error: movError } = await this.supabase
+          .from('stock movements')
+          .select('id')
+          .eq('idempotency_key', sale.idempotency_key)
+          .maybeSingle();
+
+        if (movError) {
+          throw new BadRequestException(
+            `Error checking stock movement: ${movError.message}`,
+          );
+        }
+        if (existingMovement) {
+          this.logger.warn(`Duplicate sale skipped: ${sale.idempotency_key}`);
+          continue;
+        }
+
+        // 6. Create sale record
+        const { data: newSale, error: createError } = await this.supabase
+          .from('sales')
+          .insert({
+            ...sale,
+            store_id: createSaleDto.store_id,
+            sale_date: new Date(createSaleDto.sale_date),
+          })
+          .select()
+          .maybeSingle();
+
+        if (createError) {
+          throw new BadRequestException(
+            `Error creating sale record: ${createError.message}`,
+          );
+        }
+
+        // 7. Adjust stock
+        await this.inventoryService.stockMove({
+          inventory_id: sale.inventory_id,
+          change: -sale.quantity,
+          type: sale.type,
+          idempotency_key: sale.idempotency_key,
+        });
+
+        createdSales.push(newSale);
+      }
+
+      return createdSales;
+    } catch (error) {
+      this.logger.error(`Oops an error occurred: ${error.message}`);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'An error occurred while creating sale record. Try again later',
+      );
+    }
+  }
+
+  async getSales(
     store_id: string,
     query: {
-        limit?: number;
-        page?: number;
-        start_date?: string;
-        end_date?: string;
-        search?: string;
-        order_by?: string;
-        order?: 'asc' | 'desc';
-    }
-) {
-    const limit = query.limit && query.limit > 0 ? query.limit : 10;
-    const page = query.page && query.page > 0 ? query.page : 1;
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+      limit?: number;
+      page?: number;
+      start_date?: string;
+      end_date?: string;
+      search?: string;
+      order_by?: string;
+      order?: 'asc' | 'desc';
+    },
+  ) {
+    try {
+      const limit = query.limit && query.limit > 0 ? query.limit : 10;
+      const page = query.page && query.page > 0 ? query.page : 1;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
 
-    // Base query with product and variant join
-    let supabaseQuery = this.supabase
-        .from("sales")
-        .select(`
-            id,
-            sale_date,
-            quantity,
-            price_per_unit,
-            total_price,
-            customer,
-            products (
-                id,
-                name,
-                category,
-                sku
-            ),
-            variants (
-                id,
-                name,
-                variant_sku,
-                color,
-                size
-            )
-        `, { count: "exact" })
-        .eq("store_id", store_id);
+      // Base query with product and variant join
+      let supabaseQuery = this.supabase
+        .from('sales')
+        .select(
+          `
+        id,
+        sale_date,
+        quantity,
+        price_per_unit,
+        total_price,
+        customer,
+        products (
+          id,
+          name,
+          category
+        ),
+        variants (
+          id,
+          sku,
+          color,
+          size,
+          weight,
+          dimensions
+        )
+        `,
+          { count: 'exact' },
+        )
+        .eq('store_id', store_id);
 
-    // Date filtering
-    if (query.start_date) {
-        supabaseQuery = supabaseQuery.gte("sale_date", query.start_date);
-    }
-    if (query.end_date) {
-        supabaseQuery = supabaseQuery.lte("sale_date", query.end_date);
-    }
+      // Date filtering
+      if (query.start_date) {
+        supabaseQuery = supabaseQuery.gte('sale_date', query.start_date);
+      }
+      if (query.end_date) {
+        supabaseQuery = supabaseQuery.lte('sale_date', query.end_date);
+      }
 
-    // Search filtering (by customer or product name)
-    if (query.search) {
-        supabaseQuery = supabaseQuery.or(
-            `customer.ilike.%${query.search}%,products.name.ilike.%${query.search}%`
-        );
-    }
+      // Search filtering (by customer or product name)
+      if (query.search) {
+        supabaseQuery = supabaseQuery.ilike('customer', `%${query.search}%`);
+      }
 
-    // Sorting
-    if (query.order_by) {
+      // Sorting
+      if (query.order_by) {
         supabaseQuery = supabaseQuery.order(query.order_by, {
-            ascending: query.order === "asc"
+          ascending: query.order === 'asc',
         });
-    } else {
-        supabaseQuery = supabaseQuery.order("sale_date", { ascending: false });
-    }
+      } else {
+        supabaseQuery = supabaseQuery.order('sale_date', { ascending: false });
+      }
 
-    // Pagination
-    supabaseQuery = supabaseQuery.range(from, to);
+      // Pagination
+      supabaseQuery = supabaseQuery.range(from, to);
 
-    const { data, error, count } = await supabaseQuery;
+      const { data, error, count } = await supabaseQuery;
 
-    if (error) throw new Error(`Error fetching sales: ${error.message}`);
+      if (error) {
+        console.error('Supabase query error:', error.message);
+        throw new Error('Failed to fetch sales data.');
+      }
 
-    return {
+      return {
         data,
         pagination: {
-            total: count,
-            page,
-            limit,
-            total_pages: Math.ceil((count || 0) / limit)
-        }
-    };
-}
-    findAll() {
-        return `This action returns all sales`;
+          total: count,
+          page,
+          limit,
+          total_pages: Math.ceil((count || 0) / limit),
+        },
+      };
+    } catch (err) {
+      console.error('getSales error:', err);
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+          total_pages: 0,
+        },
+        error: err instanceof Error ? err.message : 'Unknown error occurred.',
+      };
     }
+  }
 
-    findOne(id: number) {
-        return `This action returns a #${id} sale`;
-    }
+  findAll() {
+    return `This action returns all sales`;
+  }
 
-    update(id: number, updateSaleDto: UpdateSaleDto) {
-        return `This action updates a #${id} sale`;
-    }
+  findOne(id: number) {
+    return `This action returns a #${id} sale`;
+  }
 
-    remove(id: number) {
-        return `This action removes a #${id} sale`;
-    }
+  update(id: number, updateSaleDto: UpdateSaleDto) {
+    return `This action updates a #${id} sale`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} sale`;
+  }
 }

@@ -89,7 +89,7 @@ export class ProductsService {
       }));
 
       const { data: variantsData, error: variantsError } = await this.supabase
-        .from('products variants')
+        .from('variants')
         .insert(variantsToInsert)
         .select();
 
@@ -171,7 +171,7 @@ export class ProductsService {
 
       // Finds all variants for this product
       const { data: variants, error: variantsError } = await this.supabase
-        .from('products variants')
+        .from('variants')
         .select('*')
         .eq('product_id', productId);
 
@@ -281,13 +281,13 @@ export class ProductsService {
       }
       for (const product of products) {
         const { data: variants, error: fetchError } = await this.supabase
-          .from('products variants')
+          .from('variants')
           .select('*')
           .eq('product_id', product.id);
 
         if (fetchError) {
           throw new BadRequestException(
-            `An error occurred while fetching products variants: ${fetchError.message}`,
+            `An error occurred while fetching variants: ${fetchError.message}`,
           );
         }
         if (variants.length) product.variants = variants;
@@ -402,13 +402,13 @@ export class ProductsService {
       }
 
       // const { data: duplicates } = await this.supabase
-      //   .from('products variants')
+      //   .from('variants')
       //   .select('*')
       //   .eq('product_id', productId);
 
       // for (const duplicate of duplicates) {
       //   await this.supabase
-      //     .from('products variants')
+      //     .from('variants')
       //     .delete()
       //     .match({ product_id: duplicate.id }); // careful: deletes ALL with that id
       // }
@@ -465,7 +465,7 @@ export class ProductsService {
       // Find and update product variant
       const { data: updatedProductVariant, error: updateError } =
         await this.supabase
-          .from('products variants')
+          .from('variants')
           .update({ ...updateVariantDto, updated_at: new Date() })
           .match({ product_id: productId, id: variantId })
           .select();
@@ -526,7 +526,7 @@ export class ProductsService {
       // Find and delete product variant
       const { data: deletedProductVariant, error: deleteError } =
         await this.supabase
-          .from('products variants')
+          .from('variants')
           .delete()
           .match({ product_id: productId, id: variantId })
           .select();
@@ -590,7 +590,7 @@ export class ProductsService {
       // Check if a product variant exist
       const { data: productVariantExists, error: fetchError } =
         await this.supabase
-          .from('products variants')
+          .from('variants')
           .select('*')
           .match({ sku: variant.sku })
           .maybeSingle();
@@ -618,7 +618,7 @@ export class ProductsService {
         dimensions: variant.dimensions,
       };
       const { data: productVariant, error: createError } = await this.supabase
-        .from('products variants')
+        .from('variants')
         .insert([newVariant])
         .select();
 
@@ -648,7 +648,7 @@ export class ProductsService {
 
       // update the inventory id for the variant
       const { data: updatedVariant, error: updateError } = await this.supabase
-        .from('products variants')
+        .from('variants')
         .update({ inventory_id: variantInventory[0].id })
         .eq('id', productVariant[0].id)
         .select();
@@ -706,7 +706,7 @@ export class ProductsService {
 
       // Find product variants
       const { data: productVariants, error: fetchError } = await this.supabase
-        .from('products variants')
+        .from('variants')
         .select('*')
         .match({ product_id: productId })
         .select();
