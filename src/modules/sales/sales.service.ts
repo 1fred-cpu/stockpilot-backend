@@ -137,6 +137,90 @@ export class SalesService {
         }
     }
 
+async getSales(
+    store_id: string,
+    query: {
+        limit?: number;
+        page?: number;
+        start_date?: string;
+        end_date?: string;
+        search?: string;
+        order_by?: string;
+        order?: 'asc' | 'desc';
+    }
+) {
+    const limit = query.limit && query.limit > 0 ? query.limit : 10;
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Base query with product and variant join
+    let supabaseQuery = this.supabase
+        .from("sales")
+        .select(`
+            id,
+            sale_date,
+            quantity,
+            price_per_unit,
+            total_price,
+            customer,
+            products (
+                id,
+                name,
+                category,
+                sku
+            ),
+            variants (
+                id,
+                name,
+                variant_sku,
+                color,
+                size
+            )
+        `, { count: "exact" })
+        .eq("store_id", store_id);
+
+    // Date filtering
+    if (query.start_date) {
+        supabaseQuery = supabaseQuery.gte("sale_date", query.start_date);
+    }
+    if (query.end_date) {
+        supabaseQuery = supabaseQuery.lte("sale_date", query.end_date);
+    }
+
+    // Search filtering (by customer or product name)
+    if (query.search) {
+        supabaseQuery = supabaseQuery.or(
+            `customer.ilike.%${query.search}%,products.name.ilike.%${query.search}%`
+        );
+    }
+
+    // Sorting
+    if (query.order_by) {
+        supabaseQuery = supabaseQuery.order(query.order_by, {
+            ascending: query.order === "asc"
+        });
+    } else {
+        supabaseQuery = supabaseQuery.order("sale_date", { ascending: false });
+    }
+
+    // Pagination
+    supabaseQuery = supabaseQuery.range(from, to);
+
+    const { data, error, count } = await supabaseQuery;
+
+    if (error) throw new Error(`Error fetching sales: ${error.message}`);
+
+    return {
+        data,
+        pagination: {
+            total: count,
+            page,
+            limit,
+            total_pages: Math.ceil((count || 0) / limit)
+        }
+    };
+}
     findAll() {
         return `This action returns all sales`;
     }
