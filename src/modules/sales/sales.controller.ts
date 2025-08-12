@@ -14,7 +14,7 @@ import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 
-@Controller('stores/:store_id/sales')
+@Controller('sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
@@ -25,7 +25,7 @@ export class SalesController {
 
   @Get()
   async getSales(
-    @Param('store_id') store_id: string,
+    @Query('store_id') store_id: string,
     @Query('limit')
     limit?: string,
     @Query('page') page?: string,
@@ -46,18 +46,12 @@ export class SalesController {
     });
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.salesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSaleDto: UpdateSaleDto) {
-    return this.salesService.update(+id, updateSaleDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.salesService.remove(+id);
+  @Get('analytics')
+  async getSalesAnalytics(
+    @Query('store_id') storeId: string,
+    @Query('start_date') startDate?: string,
+    @Query('end_date') endDate?: string,
+  ) {
+    return this.salesService.getAnalytics(storeId, startDate, endDate);
   }
 }

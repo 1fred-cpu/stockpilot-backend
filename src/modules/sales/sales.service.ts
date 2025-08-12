@@ -231,19 +231,115 @@ export class SalesService {
     }
   }
 
-  findAll() {
-    return `This action returns all sales`;
-  }
+  async getAnalytics(storeId: string, startDate?: string, endDate?: string) {
+    try {
+      if (!storeId) {
+        throw new BadRequestException('store_id is required');
+      }
+      const dateFilter = {
+        gte: startDate || '1900-01-01',
+        lte: endDate || new Date().toISOString(),
+      };
 
-  findOne(id: number) {
-    return `This action returns a #${id} sale`;
-  }
+      // 1️⃣ Fetch sales for KPIs
+      const { data: kpisData, error: kpisError } = await this.supabase
+        .from('sales')
+        .select('total_price')
+        .eq('store_id', storeId)
+        .gte('sale_date', dateFilter.gte)
+        .lte('sale_date', dateFilter.lte);
 
-  update(id: number, updateSaleDto: UpdateSaleDto) {
-    return `This action updates a #${id} sale`;
-  }
+      if (kpisError) throw new BadRequestException(kpisError.message);
 
-  remove(id: number) {
-    return `This action removes a #${id} sale`;
+      const totalSales = kpisData.length;
+      const totalRevenue = kpisData.reduce(
+        (sum, row) => sum + (row.total_price || 0),
+        0,
+      );
+      const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+      // 2️⃣ Sales over time
+      const { data: salesOverTime, error: salesTimeError } = await this.supabase
+        .from('sales')
+        .select('sale_date, total_price')
+        .eq('store_id', storeId)
+        .gte('sale_date', dateFilter.gte)
+        .lte('sale_date', dateFilter.lte)
+        .order('sale_date', { ascending: true });
+
+      if (salesTimeError) throw new BadRequestException(salesTimeError.message);
+
+      const salesByDate: Record<
+        string,
+        { total_sales: number; total_revenue: number }
+      > = {};
+      salesOverTime.forEach((row) => {
+        const date = row.sale_date.split('T')[0];
+        if (!salesByDate[date]) {
+          salesByDate[date] = { total_sales: 0, total_revenue: 0 };
+        }
+        salesByDate[date].total_sales += 1;
+        salesByDate[date].total_revenue += row.total_price || 0;
+      });
+
+      // 3️⃣ Top products
+      const { data: topProducts, error: topProductsError } = await this.supabase
+        .from('sales')
+        .select(
+          `
+        product_id,
+        quantity,
+        total_price,
+        products(name)
+      `,
+        )
+        .eq('store_id', storeId)
+        .gte('sale_date', dateFilter.gte)
+        .lte('sale_date', dateFilter.lte);
+
+      if (topProductsError)
+        throw new BadRequestException(topProductsError.message);
+
+      const productStats: Record<
+        string,
+        { name: string; units_sold: number; total_revenue: number }
+      > = {};
+      topProducts.forEach((row) => {
+        const productName = row.products?.name || 'Unknown Product';
+        if (!productStats[productName]) {
+          productStats[productName] = {
+            name: productName,
+            units_sold: 0,
+            total_revenue: 0,
+          };
+        }
+        productStats[productName].units_sold += row.quantity || 0;
+        productStats[productName].total_revenue += row.total_price || 0;
+      });
+
+      const topProductsArray = Object.values(productStats)
+        .sort((a, b) => b.units_sold - a.units_sold)
+        .slice(0, 5);
+
+      return {
+        kpis: {
+          total_sales: totalSales,
+          total_revenue: totalRevenue,
+          average_order_value: avgOrderValue,
+          top_product: topProductsArray[0] || null,
+        },
+        sales_over_time: Object.entries(salesByDate).map(([date, stats]) => ({
+          date,
+          total_sales: stats.total_sales,
+          total_revenue: stats.total_revenue,
+        })),
+        top_products: topProductsArray,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(
+        'An error occured while getting sales analytics ',
+      );
+    }
   }
 }
