@@ -1,210 +1,229 @@
 import {
-  Injectable,
-  Inject,
-  InternalServerErrorException,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
-import { CreateStoreDto } from './dto/create-store.dto';
-import { UpdateStoreDto } from './dto/update-store.dto';
-import { isValidUUID } from '../../../utils/id-validator';
+    Injectable,
+    Inject,
+    InternalServerErrorException,
+    ConflictException,
+    BadRequestException,
+    NotFoundException,
+    Logger
+} from "@nestjs/common";
+import { CreateStoreDto } from "./dto/create-store.dto";
+import { UpdateStoreDto } from "./dto/update-store.dto";
+import { isValidUUID } from "../../../utils/id-validator";
+
 @Injectable()
 export class StoresService {
-  private readonly logger = new Logger(StoresService.name);
-  constructor(
-    @Inject('SUPABASE_CLIENT') private readonly supabase: any, // Inject Supabase client
-  ) {}
+    private readonly logger = new Logger(StoresService.name);
 
-  // Method -- Post
-  // Access -- Public
-  // Function:  A function to create a new store
-  // Returns: A success message or throws an error if the store already exists
-  async createStore(createStoreDto: CreateStoreDto) {
-    try {
-      // Check if the store already exists for the owner
-      const { data, error } = await this.supabase
-        .from('stores')
-        .select('*')
-        .eq('owner_id', createStoreDto.owner_id)
-        .maybeSingle();
+    constructor(@Inject("SUPABASE_CLIENT") private readonly supabase: any) {}
 
-      // If an error occurs or data is found, throw an error
-      if (error) {
-        throw new Error('An error occured while  checking store existence');
-      }
+    /** -------------------- CREATE STORE -------------------- **/
+    async createStore(createStoreDto: CreateStoreDto) {
+        try {
+            // Check if store already exists for the owner
+            const { data: existingStore, error: existsError } =
+                await this.supabase
+                    .from("stores")
+                    .select("*")
+                    .eq("ownerId", createStoreDto.ownerId)
+                    .maybeSingle();
 
-      if (data) {
-        throw new ConflictException('Store already exists');
-      }
+            if (existsError) {
+                this.logger.error(
+                    `Error checking store existence: ${existsError.message}`
+                );
+                throw new InternalServerErrorException(
+                    "Could not verify store existence"
+                );
+            }
 
-      // Create the new store
-      const { error: createError } = await this.supabase
-        .from('stores')
-        .insert([{ ...createStoreDto }]);
+            if (existingStore) {
+                throw new ConflictException(
+                    "Store already exists for this owner"
+                );
+            }
 
-      if (createError) {
-        throw new Error('An error occured while creating store');
-      }
+            // Insert new store
+            const { data: newStore, error: createError } = await this.supabase
+                .from("stores")
+                .insert([{ ...createStoreDto }])
+                .select()
+                .maybeSingle();
 
-      return { message: 'Store created successfully' };
-    } catch (error) {
-      if (error instanceof ConflictException) {
-        throw error; // Re-throw ConflictException
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
-      // Logs error to the  console
-      this.logger.error('Error creating store: ', error.message);
-      throw new InternalServerErrorException(
-        'An unexpected error occurred while creating the store',
-      );
+            if (createError) {
+                this.logger.error(
+                    `Error creating store: ${createError.message}`
+                );
+                throw new InternalServerErrorException("Error creating store");
+            }
+
+            return { message: "Store created successfully", store: newStore };
+        } catch (error) {
+            this.handleServiceError(error, "createStore");
+        }
     }
-  }
 
-  // Method -- Get
-  // Access -- Private
-  // Function:  A function to find store
-  // Returns: The store to the client if found or throws an error if not found
-  async findStore(storeId: string) {
-    try {
-      // Validate the format of store ID if it matches uuid format
-      const isStoreIdValid = isValidUUID(storeId);
-      if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of srore ID');
-      }
+    /** -------------------- FIND STORE -------------------- **/
+    async findStore(storeId: string) {
+        try {
+            this.validateUUID(storeId, "store ID");
 
-      // Find a store with store ID
-      const { data: store, error: fetchError } = await this.supabase
-        .from('stores')
-        .select('*')
-        .eq('id', storeId)
-        .maybeSingle();
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("*")
+                .eq("id", storeId)
+                .maybeSingle();
 
-      // If an error occurs while finding store throw an error
-      if (fetchError) {
-        throw new BadRequestException(
-          `Error finding store existence: ${fetchError.message}`,
-        );
-      }
-      if (!store) {
-        throw new NotFoundException("Store does'nt not exists");
-      }
-      // Returns data to client
-      return store;
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      } else if (error instanceof NotFoundException) {
-        throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
-      // Logs error to the  console
-      this.logger.error('Error finding store: ', error.message);
-      throw new InternalServerErrorException(
-        'An unexpected error occurred while finding store',
-      );
+            if (fetchError) {
+                this.logger.error(
+                    `Error fetching store: ${fetchError.message}`
+                );
+                throw new InternalServerErrorException("Error fetching store");
+            }
+
+            if (!store) {
+                throw new NotFoundException("Store not found");
+            }
+
+            return store;
+        } catch (error) {
+            this.handleServiceError(error, "findStore");
+        }
     }
-  }
 
-  // Method -- Patch
-  // Access -- Private
-  // Function:  A function to update store
-  /* Returns: Update the store if found and return updated store or throwa an
-    error if not found */
+    /** -------------------- UPDATE STORE -------------------- **/
+    async updateStore(storeId: string, updateStoreDto: UpdateStoreDto) {
+        try {
+            this.validateUUID(storeId, "store ID");
 
-  async updateStore(storeId: string, updateStoreDto: UpdateStoreDto) {
-    try {
-      // Validate the format of store_id if it matches uuid format
-      const isStoreIdValid = isValidUUID(storeId);
-      if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of store ID');
-      }
+            const { data, error: updateError } = await this.supabase
+                .from("stores")
+                .update({
+                    ...updateStoreDto,
+                    updatedAt: new Date().toISOString()
+                })
+                .eq("id", storeId)
+                .select();
 
-      // Find and update a store with store ID
-      const { data, error: updateError } = await this.supabase
-        .from('stores')
-        .update({ ...updateStoreDto, updated_at: new Date().toISOString() })
-        .eq('id', storeId)
-        .select();
+            if (updateError) {
+                this.logger.error(
+                    `Error updating store: ${updateError.message}`
+                );
+                throw new InternalServerErrorException("Error updating store");
+            }
 
-      const updatedProduct = data[0];
+            const updatedStore = data[0];
+            if (!updatedStore) {
+                throw new NotFoundException("Store not found");
+            }
 
-      // If an error occurs while updating store throw an error
-      if (updateError) {
-        throw new BadRequestException(
-          `An error occured while updating store: ${updateError.message}`,
-        );
-      }
-      if (!updatedProduct) {
-        throw new NotFoundException("Store does'nt exists");
-      }
-      // Return updated data to client
-      return updatedProduct;
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      } else if (error instanceof NotFoundException) {
-        throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
-      // Logs error to the  console
-      this.logger.error('Error updating store: ', error.message);
-      throw new InternalServerErrorException(
-        'An unexpected error occurred while updating store',
-      );
+            return {
+                message: "Store updated successfully",
+                store: updatedStore
+            };
+        } catch (error) {
+            this.handleServiceError(error, "updateStore");
+        }
     }
-  }
 
-  // Method -- Delete
-  // Access -- Private
-  // Function:  A function to delete store
-  /* Returns: Delete the store if found and return deleted store or throwa an
-    error if not found */
+    /** -------------------- DELETE STORE -------------------- **/
+    async deleteStore(storeId: string) {
+        try {
+            this.validateUUID(storeId, "store ID");
 
-  async deleteStore(storeId: string) {
-    try {
-      // Validate the format of store_id if it matches uuid format
-      const isStoreIdValid = isValidUUID(storeId);
-      if (!isStoreIdValid) {
-        throw new BadRequestException('Invalid format of store ID');
-      }
+            const { data, error: deleteError } = await this.supabase
+                .from("stores")
+                .delete()
+                .eq("id", storeId)
+                .select();
 
-      // Find and delete a store with store_id
-      const { data, error: deleteError } = await this.supabase
-        .from('stores')
-        .delete()
-        .eq('id', storeId)
-        .select();
+            if (deleteError) {
+                this.logger.error(
+                    `Error deleting store: ${deleteError.message}`
+                );
+                throw new InternalServerErrorException("Error deleting store");
+            }
 
-      const deletedStore = data[0];
-      // If an error occurs while deleting store throw an error
-      if (deleteError) {
-        throw new Error(
-          `An error occured while deleting store ${deleteError.message}`,
-        );
-      }
-      if (!deletedStore) {
-        throw new NotFoundException('Store not found');
-      }
-      // Return a message  to client
-      return { message: 'Store deleted successfully' };
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      } else if (error instanceof NotFoundException) {
-        throw error;
-      } else if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
-      // Logs error to the  console
-      this.logger.error('Error deleting store: ', error.message);
-      throw new InternalServerErrorException(
-        'An unexpected error occurred while deleting store',
-      );
+            const deletedStore = data[0];
+            if (!deletedStore) {
+                throw new NotFoundException("Store not found");
+            }
+
+            return { message: "Store deleted successfully" };
+        } catch (error) {
+            this.handleServiceError(error, "deleteStore");
+        }
     }
-  }
+    async findAllStores(query: {
+        limit?: number;
+        page?: number;
+        ownerId?: string;
+        businessType?: string;
+    }) {
+        try {
+            const { limit = 10, page = 1, ownerId, businessType } = query;
+
+            let supabaseQuery = this.supabase
+                .from("stores")
+                .select("*", { count: "exact" });
+
+            // Apply filters if provided
+            if (ownerId) {
+                supabaseQuery = supabaseQuery.eq("ownerId", ownerId);
+            }
+
+            if (businessType) {
+                supabaseQuery = supabaseQuery.ilike(
+                    "businessType",
+                    `%${businessType}%`
+                );
+            }
+
+            // Apply pagination
+            const from = (page - 1) * limit;
+            const to = from + limit - 1;
+            supabaseQuery = supabaseQuery.range(from, to);
+
+            const { data, error, count } = await supabaseQuery;
+
+            if (error) {
+                throw new BadRequestException(
+                    `Error fetching stores: ${error.message}`
+                );
+            }
+
+            return {
+                stores: data,
+                pagination: {
+                    total: count,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(count / limit)
+                }
+            };
+        } catch (error) {
+            if (error instanceof BadRequestException) throw error;
+            throw new InternalServerErrorException(
+                "An error occurred while fetching stores"
+            );
+        }
+    }
+    /** -------------------- HELPER METHODS -------------------- **/
+    private validateUUID(id: string, label: string) {
+        if (!isValidUUID(id)) {
+            throw new BadRequestException(`Invalid format for ${label}`);
+        }
+    }
+
+    private handleServiceError(error: any, method: string) {
+        if (
+            error instanceof BadRequestException ||
+            error instanceof NotFoundException ||
+            error instanceof ConflictException
+        ) {
+            throw error;
+        }
+        this.logger.error(`Unexpected error in ${method}: ${error.message}`);
+        throw new InternalServerErrorException("An unexpected error occurred");
+    }
 }

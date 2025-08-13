@@ -1,37 +1,36 @@
 import {
-  IsString,
-  IsNotEmpty,
-  IsArray,
-  IsEmail,
-  IsPhoneNumber,
-  IsUrl,
-  IsUUID,
-} from 'class-validator';
+    IsString,
+    IsNotEmpty,
+    IsArray,
+    IsEmail,
+    IsPhoneNumber,
+    IsUrl,
+    IsUUID
+} from "class-validator";
 
 export class CreateStoreDto {
+    @IsString()
+    @IsNotEmpty()
+    storeName: string;
 
-  @IsString()
-  @IsNotEmpty()
-  store_name: string;
+    @IsString()
+    @IsNotEmpty()
+    businessType: string;
 
-  @IsString()
-  @IsNotEmpty()
-  business_type: string;
+    @IsArray()
+    @IsNotEmpty()
+    platforms: string[];
 
-  @IsArray()
-  @IsNotEmpty()
-  platforms: string[];
+    @IsEmail()
+    contactEmail: string;
 
-  @IsEmail()
-  contact_email: string;
+    @IsPhoneNumber()
+    contactPhone: string;
 
-  @IsPhoneNumber()
-  contact_phone: string;
+    @IsUrl()
+    logoUrl: string;
 
-  @IsUrl()
-  logo_url: string;
-
-  @IsString()
-  @IsNotEmpty()
-  location: string;
+    @IsString()
+    @IsNotEmpty()
+    location: string;
 }

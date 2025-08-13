@@ -10,78 +10,75 @@ import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { isValidUUID } from '../../../utils/id-validator';
 import { InventoryService } from '../inventory/inventory.service';
-import { Response } from 'express';
 
 @Injectable()
 export class SalesService {
-  private logger = new Logger(SalesService.name);
+  private readonly logger = new Logger(SalesService.name);
+
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: any,
     private readonly inventoryService: InventoryService,
   ) {}
+
   async createSale(createSaleDto: CreateSaleDto) {
     try {
+      const { storeId, saleDate, sales } = createSaleDto;
+
       // 1. Validate store ID
-      if (!isValidUUID(createSaleDto.store_id)) {
-        throw new BadRequestException('Invalid store ID format');
+      if (!isValidUUID(storeId)) {
+        throw new BadRequestException('Invalid storeId format');
       }
 
       // 2. Check if store exists
-      const { data: store, error: fetchError } = await this.supabase
+      const { data: store, error: storeError } = await this.supabase
         .from('stores')
-        .select('*')
-        .eq('id', createSaleDto.store_id)
+        .select('id')
+        .eq('id', storeId)
         .maybeSingle();
 
-      if (fetchError) {
-        throw new BadRequestException(
-          `Error checking store existence: ${fetchError.message}`,
-        );
+      if (storeError) {
+        throw new BadRequestException(`Error checking store: ${storeError.message}`);
       }
       if (!store) {
-        throw new NotFoundException("Store doesn't exist");
+        throw new NotFoundException('Store does not exist');
       }
 
       const createdSales: any[] = [];
 
-      for (const sale of createSaleDto.sales) {
+      for (const sale of sales) {
+        const { idempotencyKey, productId, inventoryId, quantity, type } = sale;
+
         // 3. Validate idempotency key
-        if (!sale.idempotency_key) {
-          throw new BadRequestException('idempotency_key was not provided');
+        if (!idempotencyKey) {
+          throw new BadRequestException('idempotencyKey is required');
         }
 
-        // 4. Validate product exists and belongs to this store
+        // 4. Validate product exists in the store
         const { data: product, error: productError } = await this.supabase
           .from('products')
           .select('id')
-          .match({ id: sale.product_id, store_id: createSaleDto.store_id })
+          .match({ id: productId, storeId })
           .maybeSingle();
 
         if (productError) {
-          throw new BadRequestException(
-            `Error checking product existence: ${productError.message}`,
-          );
+          throw new BadRequestException(`Error checking product: ${productError.message}`);
         }
         if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${sale.product_id} not found in this store`,
-          );
+          throw new NotFoundException(`Product with ID ${productId} not found in this store`);
         }
 
-        // 5. Check idempotency key in stock movements
-        const { data: existingMovement, error: movError } = await this.supabase
-          .from('stock movements')
+        // 5. Check for duplicate sale using idempotency key
+        const { data: existingMovement, error: movementError } = await this.supabase
+          .from('stockMovements')
           .select('id')
-          .eq('idempotency_key', sale.idempotency_key)
+          .eq('idempotencyKey', idempotencyKey)
           .maybeSingle();
 
-        if (movError) {
-          throw new BadRequestException(
-            `Error checking stock movement: ${movError.message}`,
-          );
+        if (movementError) {
+          throw new BadRequestException(`Error checking stock movement: ${movementError.message}`);
         }
         if (existingMovement) {
-          this.logger.warn(`Duplicate sale skipped: ${sale.idempotency_key}`);
+          this.logger.warn(`Duplicate sale skipped: ${idempotencyKey}`);
           continue;
         }
 
@@ -90,24 +87,22 @@ export class SalesService {
           .from('sales')
           .insert({
             ...sale,
-            store_id: createSaleDto.store_id,
-            sale_date: new Date(createSaleDto.sale_date),
+            storeId,
+            saleDate: new Date(saleDate),
           })
           .select()
           .maybeSingle();
 
         if (createError) {
-          throw new BadRequestException(
-            `Error creating sale record: ${createError.message}`,
-          );
+          throw new BadRequestException(`Error creating sale: ${createError.message}`);
         }
 
         // 7. Adjust stock
         await this.inventoryService.stockMove({
-          inventory_id: sale.inventory_id,
-          change: -sale.quantity,
-          type: sale.type,
-          idempotency_key: sale.idempotency_key,
+          inventoryId,
+          change: -quantity,
+          type,
+          idempotencyKey,
         });
 
         createdSales.push(newSale);
@@ -115,28 +110,25 @@ export class SalesService {
 
       return createdSales;
     } catch (error) {
-      this.logger.error(`Oops an error occurred: ${error.message}`);
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
+      this.logger.error(`Error in createSale: ${error.message}`);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
       throw new InternalServerErrorException(
-        'An error occurred while creating sale record. Try again later',
+        'An error occurred while creating sale record. Please try again later',
       );
     }
   }
 
   async getSales(
-    store_id: string,
+    storeId: string,
     query: {
       limit?: number;
       page?: number;
-      start_date?: string;
-      end_date?: string;
+      startDate?: string;
+      endDate?: string;
       search?: string;
-      order_by?: string;
+      orderBy?: string;
       order?: 'asc' | 'desc';
     },
   ) {
@@ -146,65 +138,46 @@ export class SalesService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      // Base query with product and variant join
       let supabaseQuery = this.supabase
         .from('sales')
         .select(
           `
-        id,
-        sale_date,
-        quantity,
-        price_per_unit,
-        total_price,
-        customer,
-        products (
           id,
-          name,
-          category
-        ),
-        variants (
-          id,
-          sku,
-          color,
-          size,
-          weight,
-          dimensions
-        )
+          saleDate,
+          quantity,
+          pricePerUnit,
+          totalPrice,
+          customer,
+          products (id, name, category),
+          variants (id, sku, color, size, weight, dimensions)
         `,
           { count: 'exact' },
         )
-        .eq('store_id', store_id);
+        .eq('storeId', storeId);
 
-      // Date filtering
-      if (query.start_date) {
-        supabaseQuery = supabaseQuery.gte('sale_date', query.start_date);
+      if (query.startDate) {
+        supabaseQuery = supabaseQuery.gte('saleDate', query.startDate);
       }
-      if (query.end_date) {
-        supabaseQuery = supabaseQuery.lte('sale_date', query.end_date);
+      if (query.endDate) {
+        supabaseQuery = supabaseQuery.lte('saleDate', query.endDate);
       }
-
-      // Search filtering (by customer or product name)
       if (query.search) {
         supabaseQuery = supabaseQuery.ilike('customer', `%${query.search}%`);
       }
-
-      // Sorting
-      if (query.order_by) {
-        supabaseQuery = supabaseQuery.order(query.order_by, {
+      if (query.orderBy) {
+        supabaseQuery = supabaseQuery.order(query.orderBy, {
           ascending: query.order === 'asc',
         });
       } else {
-        supabaseQuery = supabaseQuery.order('sale_date', { ascending: false });
+        supabaseQuery = supabaseQuery.order('saleDate', { ascending: false });
       }
 
-      // Pagination
       supabaseQuery = supabaseQuery.range(from, to);
 
       const { data, error, count } = await supabaseQuery;
 
       if (error) {
-        console.error('Supabase query error:', error.message);
-        throw new Error('Failed to fetch sales data.');
+        throw new BadRequestException(`Error fetching sales: ${error.message}`);
       }
 
       return {
@@ -213,133 +186,105 @@ export class SalesService {
           total: count,
           page,
           limit,
-          total_pages: Math.ceil((count || 0) / limit),
+          totalPages: Math.ceil((count || 0) / limit),
         },
       };
-    } catch (err) {
-      console.error('getSales error:', err);
-      return {
-        data: [],
-        pagination: {
-          total: 0,
-          page: query.page || 1,
-          limit: query.limit || 10,
-          total_pages: 0,
-        },
-        error: err instanceof Error ? err.message : 'Unknown error occurred.',
-      };
+    } catch (error) {
+      this.logger.error(`Error in getSales: ${error.message}`);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException('An error occurred while fetching sales data');
     }
   }
 
   async getAnalytics(storeId: string, startDate?: string, endDate?: string) {
     try {
       if (!storeId) {
-        throw new BadRequestException('store_id is required');
+        throw new BadRequestException('storeId is required');
       }
-      const dateFilter = {
+
+      const dateRange = {
         gte: startDate || '1900-01-01',
         lte: endDate || new Date().toISOString(),
       };
 
-      // 1️⃣ Fetch sales for KPIs
-      const { data: kpisData, error: kpisError } = await this.supabase
+      // 1. KPIs
+      const { data: salesData, error: salesError } = await this.supabase
         .from('sales')
-        .select('total_price')
-        .eq('store_id', storeId)
-        .gte('sale_date', dateFilter.gte)
-        .lte('sale_date', dateFilter.lte);
+        .select('totalPrice')
+        .eq('storeId', storeId)
+        .gte('saleDate', dateRange.gte)
+        .lte('saleDate', dateRange.lte);
 
-      if (kpisError) throw new BadRequestException(kpisError.message);
+      if (salesError) throw new BadRequestException(salesError.message);
 
-      const totalSales = kpisData.length;
-      const totalRevenue = kpisData.reduce(
-        (sum, row) => sum + (row.total_price || 0),
-        0,
-      );
+      const totalSales = salesData.length;
+      const totalRevenue = salesData.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
       const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
-      // 2️⃣ Sales over time
-      const { data: salesOverTime, error: salesTimeError } = await this.supabase
+      // 2. Sales over time
+      const { data: timelineData, error: timelineError } = await this.supabase
         .from('sales')
-        .select('sale_date, total_price')
-        .eq('store_id', storeId)
-        .gte('sale_date', dateFilter.gte)
-        .lte('sale_date', dateFilter.lte)
-        .order('sale_date', { ascending: true });
+        .select('saleDate, totalPrice')
+        .eq('storeId', storeId)
+        .gte('saleDate', dateRange.gte)
+        .lte('saleDate', dateRange.lte)
+        .order('saleDate', { ascending: true });
 
-      if (salesTimeError) throw new BadRequestException(salesTimeError.message);
+      if (timelineError) throw new BadRequestException(timelineError.message);
 
-      const salesByDate: Record<
-        string,
-        { total_sales: number; total_revenue: number }
-      > = {};
-      salesOverTime.forEach((row) => {
-        const date = row.sale_date.split('T')[0];
+      const salesByDate: Record<string, { totalSales: number; totalRevenue: number }> = {};
+      timelineData.forEach((row) => {
+        const date = row.saleDate.split('T')[0];
         if (!salesByDate[date]) {
-          salesByDate[date] = { total_sales: 0, total_revenue: 0 };
+          salesByDate[date] = { totalSales: 0, totalRevenue: 0 };
         }
-        salesByDate[date].total_sales += 1;
-        salesByDate[date].total_revenue += row.total_price || 0;
+        salesByDate[date].totalSales += 1;
+        salesByDate[date].totalRevenue += row.totalPrice || 0;
       });
 
-      // 3️⃣ Top products
-      const { data: topProducts, error: topProductsError } = await this.supabase
+      // 3. Top products
+      const { data: topProductsData, error: topProductsError } = await this.supabase
         .from('sales')
-        .select(
-          `
-        product_id,
-        quantity,
-        total_price,
-        products(name)
-      `,
-        )
-        .eq('store_id', storeId)
-        .gte('sale_date', dateFilter.gte)
-        .lte('sale_date', dateFilter.lte);
+        .select(`productId, quantity, totalPrice, products(name)`)
+        .eq('storeId', storeId)
+        .gte('saleDate', dateRange.gte)
+        .lte('saleDate', dateRange.lte);
 
-      if (topProductsError)
-        throw new BadRequestException(topProductsError.message);
+      if (topProductsError) throw new BadRequestException(topProductsError.message);
 
-      const productStats: Record<
-        string,
-        { name: string; units_sold: number; total_revenue: number }
-      > = {};
-      topProducts.forEach((row) => {
-        const productName = row.products?.name || 'Unknown Product';
-        if (!productStats[productName]) {
-          productStats[productName] = {
-            name: productName,
-            units_sold: 0,
-            total_revenue: 0,
-          };
+      const productStats: Record<string, { name: string; unitsSold: number; totalRevenue: number }> =
+        {};
+      topProductsData.forEach((row) => {
+        const name = row.products?.name || 'Unknown Product';
+        if (!productStats[name]) {
+          productStats[name] = { name, unitsSold: 0, totalRevenue: 0 };
         }
-        productStats[productName].units_sold += row.quantity || 0;
-        productStats[productName].total_revenue += row.total_price || 0;
+        productStats[name].unitsSold += row.quantity || 0;
+        productStats[name].totalRevenue += row.totalPrice || 0;
       });
 
-      const topProductsArray = Object.values(productStats)
-        .sort((a, b) => b.units_sold - a.units_sold)
+      const topProducts = Object.values(productStats)
+        .sort((a, b) => b.unitsSold - a.unitsSold)
         .slice(0, 5);
 
       return {
         kpis: {
-          total_sales: totalSales,
-          total_revenue: totalRevenue,
-          average_order_value: avgOrderValue,
-          top_product: topProductsArray[0] || null,
+          totalSales,
+          totalRevenue,
+          averageOrderValue: avgOrderValue,
+          topProduct: topProducts[0] || null,
         },
-        sales_over_time: Object.entries(salesByDate).map(([date, stats]) => ({
+        salesOverTime: Object.entries(salesByDate).map(([date, stats]) => ({
           date,
-          total_sales: stats.total_sales,
-          total_revenue: stats.total_revenue,
+          totalSales: stats.totalSales,
+          totalRevenue: stats.totalRevenue,
         })),
-        top_products: topProductsArray,
+        topProducts,
       };
     } catch (error) {
+      this.logger.error(`Error in getAnalytics: ${error.message}`);
       if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(
-        'An error occured while getting sales analytics ',
-      );
+      throw new InternalServerErrorException('An error occurred while fetching sales analytics');
     }
   }
 }

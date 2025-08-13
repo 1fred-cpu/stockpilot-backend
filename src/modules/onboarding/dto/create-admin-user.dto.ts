@@ -11,7 +11,7 @@ import {
 export class CreateAdminUserDto {
     @IsString()
     @IsNotEmpty()
-    full_name: string;
+    fullName: string;
 
     @IsString()
     @IsNotEmpty()
@@ -21,11 +21,11 @@ export class CreateAdminUserDto {
     email: string;
 
     @IsPhoneNumber()
-    phone_number: string;
+    phoneNumber: string;
 
     @IsUrl()
-    avatar_url: string;
+    avatarUrl: string;
 
     @IsUUID()
-    store_id: string;
+    storeId: string;
 }

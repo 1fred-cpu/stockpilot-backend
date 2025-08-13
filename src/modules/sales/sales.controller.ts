@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  Res,
   ValidationPipe,
   Query,
 } from '@nestjs/common';
@@ -25,32 +24,31 @@ export class SalesController {
 
   @Get()
   async getSales(
-    @Query('store_id') store_id: string,
-    @Query('limit')
-    limit?: string,
+    @Query('storeId') storeId: string,
+    @Query('limit') limit?: string,
     @Query('page') page?: string,
-    @Query('start_date') start_date?: string,
-    @Query('end_date') end_date?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('search') search?: string,
-    @Query('order_by') order_by?: string,
+    @Query('orderBy') orderBy?: string,
     @Query('order') order?: 'asc' | 'desc',
   ) {
-    return this.salesService.getSales(store_id, {
-      limit: Number(limit),
-      page: Number(page),
-      start_date,
-      end_date,
+    return this.salesService.getSales(storeId, {
+      limit: limit ? Number(limit) : undefined,
+      page: page ? Number(page) : undefined,
+      startDate,
+      endDate,
       search,
-      order_by,
+      orderBy,
       order,
     });
   }
 
   @Get('analytics')
   async getSalesAnalytics(
-    @Query('store_id') storeId: string,
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
+    @Query('storeId') storeId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     return this.salesService.getAnalytics(storeId, startDate, endDate);
   }

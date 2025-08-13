@@ -1,141 +1,135 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ValidationPipe,
-  Query,
-} from '@nestjs/common';
-import { ProductsService } from './products.service';
-import { CreateProductDto, Variant } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { Filter } from 'types/filter';
+    Controller,
+    Get,
+    Post,
+    Body,
+    Patch,
+    Param,
+    Delete,
+    ValidationPipe,
+    Query
+} from "@nestjs/common";
+import { ProductsService } from "./products.service";
+import { CreateProductDto, Variant } from "./dto/create-product.dto";
+import { UpdateProductDto } from "./dto/update-product.dto";
+import { Filter } from "types/filter";
 
-@Controller('stores/:storeId/products')
+@Controller("stores/:storeId/products")
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+    constructor(private readonly productsService: ProductsService) {}
 
-  // Method -- Post
-  // Access -- Private
-  // Function:  A function to create a new product
-  // Returns: A created product or throws an error if the product already exists
-  // Endpoint: /v1/api/stores/:storeId/products
-  @Post()
-  async createProduct(
-    @Body(ValidationPipe) createProductDto: CreateProductDto,
-  ) {
-    return this.productsService.createProduct(createProductDto);
-  }
+    /** Create a new product */
+    @Post()
+    async createProduct(
+        @Param("storeId") storeId: string,
+        @Body(ValidationPipe) createProductDto: CreateProductDto
+    ) {
+        return this.productsService.createProduct({
+            ...createProductDto,
+            storeId
+        });
+    }
 
-  // Method -- Post
-  // Access -- Private
-  // Function:  A function to add new variant to product
-  // Returns: A created variant or throws an error if variant already exists
-  // Endpoint: /v1/api/stores/:storeId/products/:productId/variants
-  @Post(':productId/variants')
-  async addProductVariant(
-    @Param('productId') productId: string,
-    @Body(ValidationPipe) variant: Variant,
-  ) {
-    return this.productsService.addProductVariant(productId, variant);
-  }
+    /** Add a new variant to an existing product */
+    @Post(":productId/variants")
+    async addProductVariant(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body(ValidationPipe) variant: Variant
+    ) {
+        return this.productsService.addProductVariant(
+            storeId,
+            productId,
+            variant
+        );
+    }
 
-  // Method -- Get
-  // Access -- Private
-  // Function:  A function to get products
-  // Returns: products for a store or throws an error if store is not found
-  // Endpoint: /v1/api/stores/:storeId/products/
-  @Get()
-  async getProducts(
-    @Param('storeId') storeId: string,
-    @Query('filter') filter: Filter,
-    @Query('limit') limit: number = 10,
-    @Query('sort') sort: 'asc' | 'desc',
-    @Query('category') category: string,
-  ) {
-    return this.productsService.getProducts(
-      storeId,
-      filter,
-      Number(limit),
-      sort,
-      category,
-    );
-  }
+    /** Get products for a store */
+    @Get()
+    async getProducts(
+        @Param("storeId") storeId: string,
+        @Query("filter") filter: Filter,
+        @Query("limit") limit: number = 10,
+        @Query("sort") sort: "asc" | "desc" = "asc",
+        @Query("category") category?: string
+    ) {
+        return this.productsService.getProducts(
+            storeId,
+            filter,
+            Number(limit),
+            sort,
+            category
+        );
+    }
 
-  // Method -- Get
-  // Access -- Private
-  // Function:  A function to find product
-  // Returns: A product or throws an error if product does not exist
-  // Endpoint: /v1/api/stores/:storeId/products/:productId/
-  @Get(':productId')
-  async findProduct(@Param('productId') productId: string) {
-    return this.productsService.findProduct(productId);
-  }
+    /** Find a specific product */
+    @Get(":productId")
+    async findProduct(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string
+    ) {
+        return this.productsService.findProduct(storeId, productId);
+    }
 
-  // Method -- Get
-  // Access -- Private
-  // Function:  A function to get product variants
-  // Returns: A product variants or throws an error if variant already exists
-  // Endpoint: /v1/api/stores/:storeId/products/:productId/variants
-  @Get(':productId/variants')
-  async getProductVariants(@Param('productId') productId: string) {
-    return this.productsService.getProductVariants(productId);
-  }
+    /** Get all variants for a product */
+    @Get(":productId/variants")
+    async getProductVariants(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string
+    ) {
+        return this.productsService.getProductVariants(storeId, productId);
+    }
 
-  // Method -- Patch
-  // Access -- Private
-  // Function:  A function to update product
-  // Returns: A updated product or throws an error if product not found
-  // Endpoint: /v1/api/stores/:storeId/products/:productId
-  @Patch(':productId')
-  async updateProduct(
-    @Param('productId') productId: string,
-    @Body(ValidationPipe) updateProductDto: UpdateProductDto,
-  ) {
-    return this.productsService.updateProduct(productId, updateProductDto);
-  }
+    /** Update an existing product */
+    @Patch(":productId")
+    async updateProduct(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Body(ValidationPipe) updateProductDto: UpdateProductDto
+    ) {
+        return this.productsService.updateProduct(
+            storeId,
+            productId,
+            updateProductDto
+        );
+    }
 
-  // Method -- Patch
-  // Access -- Private
-  // Function:  A function to update product variant
-  // Returns: A updated product variant or throws an error if product and product variant does not exists
-  // Endpoint: /v1/api/stores/:storeId/products/:productId/variants/:variantId
-  @Patch(':productId/variants/:variantId')
-  async updateProductVariant(
-    @Param('productId') productId: string,
-    @Param('variantId') variantId: string,
-    @Body() updateVarinatDto: any,
-  ) {
-    return this.productsService.updateProductVariant(
-      productId,
-      variantId,
-      updateVarinatDto,
-    );
-  }
+    /** Update a specific product variant */
+    @Patch(":productId/variants/:variantId")
+    async updateProductVariant(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Param("variantId") variantId: string,
+        @Body(ValidationPipe) updateVariantDto: any
+    ) {
+        return this.productsService.updateProductVariant(
+            storeId,
+            productId,
+            variantId,
+            updateVariantDto
+        );
+    }
 
-  // Method -- Delete
-  // Access -- Private
-  // Function:  A function to delete product
-  // Returns: A deleted product or throws an error if product does not exist
-  // Endpoint: /v1/api/stores/:storeId/products/:productId
-  @Delete(':productId')
-  async deleteProduct(@Param('productId') productId: string) {
-    return this.productsService.deleteProduct(productId);
-  }
+    /** Delete a product */
+    @Delete(":productId")
+    async deleteProduct(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string
+    ) {
+        return this.productsService.deleteProduct(storeId, productId);
+    }
 
-  // Method -- Delete
-  // Access -- Private
-  // Function:  A function to delete product variant
-  // Returns: A deleted variant or throws an error if variant does not exist
-  // Endpoint: /v1/api/stores/:storeId/products/:productId/variants/:variantId
-  @Delete(':productId/variants/:variantId')
-  async deleteProductVariant(
-    @Param('productId') productId: string,
-    @Param('variantId') variantId: string,
-  ) {
-    return this.productsService.deleteProductVariant(productId, variantId);
-  }
+    /** Delete a product variant */
+    @Delete(":productId/variants/:variantId")
+    async deleteProductVariant(
+        @Param("storeId") storeId: string,
+        @Param("productId") productId: string,
+        @Param("variantId") variantId: string
+    ) {
+        return this.productsService.deleteProductVariant(
+            storeId,
+            productId,
+            variantId
+        );
+    }
 }

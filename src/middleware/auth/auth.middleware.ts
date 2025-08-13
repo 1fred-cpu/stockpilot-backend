@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class SupabaseAuthMiddleware implements NestMiddleware {
+export class AuthMiddleware implements NestMiddleware {
   constructor(private readonly configService: ConfigService) {}
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
