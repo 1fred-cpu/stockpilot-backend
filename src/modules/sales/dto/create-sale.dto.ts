@@ -5,7 +5,10 @@ import {
     IsOptional,
     IsDateString,
     Min,
+    IsObject,
+    IsEmail,
     IsArray,
+    IsPhoneNumber,
     ValidateNested
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -28,10 +31,10 @@ export class Sale {
     @IsNumber()
     @Min(0)
     totalPrice: number;
-
-    @IsOptional()
-    @IsString()
-    customer?: string;
+    //
+    //     @IsOptional()
+    //     @IsString()
+    //     customer?: string;
 
     @IsUUID()
     inventoryId: string;
@@ -41,6 +44,9 @@ export class Sale {
 
     @IsString()
     type: string;
+
+    @IsObject()
+    customer: Customer;
 }
 
 export class CreateSaleDto {
@@ -54,4 +60,15 @@ export class CreateSaleDto {
     @ValidateNested({ each: true })
     @Type(() => Sale)
     sales: Sale[];
+}
+
+class Customer {
+    @IsString()
+    name: string;
+
+    @IsEmail()
+    email: string;
+
+    @IsPhoneNumber()
+    phoneNumber: string;
 }

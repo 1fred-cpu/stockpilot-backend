@@ -33,15 +33,11 @@ export class ProductsController {
     /** Add a new variant to an existing product */
     @Post(":productId/variants")
     async addProductVariant(
-        @Param("storeId") storeId: string,
+        
         @Param("productId") productId: string,
         @Body(ValidationPipe) variant: Variant
     ) {
-        return this.productsService.addProductVariant(
-            storeId,
-            productId,
-            variant
-        );
+        return this.productsService.addProductVariant(productId, variant);
     }
 
     /** Get products for a store */
@@ -64,11 +60,8 @@ export class ProductsController {
 
     /** Find a specific product */
     @Get(":productId")
-    async findProduct(
-        @Param("storeId") storeId: string,
-        @Param("productId") productId: string
-    ) {
-        return this.productsService.findProduct(storeId, productId);
+    async findProduct(@Param("productId") productId: string) {
+        return this.productsService.findProduct(productId);
     }
 
     /** Get all variants for a product */
@@ -83,27 +76,20 @@ export class ProductsController {
     /** Update an existing product */
     @Patch(":productId")
     async updateProduct(
-        @Param("storeId") storeId: string,
         @Param("productId") productId: string,
         @Body(ValidationPipe) updateProductDto: UpdateProductDto
     ) {
-        return this.productsService.updateProduct(
-            storeId,
-            productId,
-            updateProductDto
-        );
+        return this.productsService.updateProduct(productId, updateProductDto);
     }
 
     /** Update a specific product variant */
     @Patch(":productId/variants/:variantId")
     async updateProductVariant(
-        @Param("storeId") storeId: string,
         @Param("productId") productId: string,
         @Param("variantId") variantId: string,
         @Body(ValidationPipe) updateVariantDto: any
     ) {
         return this.productsService.updateProductVariant(
-            storeId,
             productId,
             variantId,
             updateVariantDto
@@ -112,24 +98,16 @@ export class ProductsController {
 
     /** Delete a product */
     @Delete(":productId")
-    async deleteProduct(
-        @Param("storeId") storeId: string,
-        @Param("productId") productId: string
-    ) {
-        return this.productsService.deleteProduct(storeId, productId);
+    async deleteProduct(@Param("productId") productId: string) {
+        return this.productsService.deleteProduct(productId);
     }
 
     /** Delete a product variant */
     @Delete(":productId/variants/:variantId")
     async deleteProductVariant(
-        @Param("storeId") storeId: string,
         @Param("productId") productId: string,
         @Param("variantId") variantId: string
     ) {
-        return this.productsService.deleteProductVariant(
-            storeId,
-            productId,
-            variantId
-        );
+        return this.productsService.deleteProductVariant(productId, variantId);
     }
 }

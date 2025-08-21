@@ -8,5 +8,5 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
-  full_name: string;
+  fullName: string;
 }

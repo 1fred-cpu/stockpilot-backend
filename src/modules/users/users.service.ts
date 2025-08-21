@@ -3,11 +3,12 @@ import {
     ConflictException,
     Inject,
     Injectable,
+    NotFoundException,
     InternalServerErrorException
 } from "@nestjs/common";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
-
+import { isValidUUID } from "../../../utils/id-validator";
 @Injectable()
 export class UsersService {
     constructor(
@@ -18,7 +19,7 @@ export class UsersService {
     async createUser(createUserDto: CreateUserDto) {
         try {
             // Validate ID format
-            if (!isUUID(createUserDto.id)) {
+            if (!isValidUUID(createUserDto.id)) {
                 throw new BadRequestException("Invalid user ID format");
             }
 

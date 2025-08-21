@@ -13,6 +13,7 @@ import { RoleMiddleware } from "./middleware/role/role.middleware";
 import { UsersModule } from "./modules/users/users.module";
 import { OnboardingModule } from "./modules/onboarding/onboarding.module";
 import { AuthMiddlewareModule } from "./middleware/auth/auth.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 @Module({
     imports: [
         // Load environment variables from .env file
@@ -39,7 +40,8 @@ import { AuthMiddlewareModule } from "./middleware/auth/auth.module";
         InventoryModule,
         SalesModule,
         UsersModule,
-        OnboardingModule
+        OnboardingModule,
+        AnalyticsModule
     ],
     controllers: [AppController],
     providers: [
