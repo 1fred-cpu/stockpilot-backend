@@ -33,7 +33,6 @@ export class ProductsController {
     /** Add a new variant to an existing product */
     @Post(":productId/variants")
     async addProductVariant(
-        
         @Param("productId") productId: string,
         @Body(ValidationPipe) variant: Variant
     ) {
@@ -65,13 +64,13 @@ export class ProductsController {
     }
 
     /** Get all variants for a product */
-    @Get(":productId/variants")
-    async getProductVariants(
-        @Param("storeId") storeId: string,
-        @Param("productId") productId: string
-    ) {
-        return this.productsService.getProductVariants(storeId, productId);
-    }
+//     @Get(":productId/variants")
+//     async getProductVariants(
+//         @Param("storeId") storeId: string,
+//         @Param("productId") productId: string
+//     ) {
+//         return this.productsService.getProductVariants(storeId, productId);
+//     }
 
     /** Update an existing product */
     @Patch(":productId")

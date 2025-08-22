@@ -14,6 +14,7 @@ import { UsersModule } from "./modules/users/users.module";
 import { OnboardingModule } from "./modules/onboarding/onboarding.module";
 import { AuthMiddlewareModule } from "./middleware/auth/auth.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { BillingModule } from "./modules/billing/billing.module";
 @Module({
     imports: [
         // Load environment variables from .env file
@@ -41,7 +42,8 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
         SalesModule,
         UsersModule,
         OnboardingModule,
-        AnalyticsModule
+        AnalyticsModule,
+        BillingModule
     ],
     controllers: [AppController],
     providers: [

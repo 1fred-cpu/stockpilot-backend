@@ -13,6 +13,16 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 
+class Customer {
+    @IsString()
+    name: string;
+
+    @IsEmail()
+    email: string;
+
+    @IsPhoneNumber()
+    phoneNumber: string;
+}
 export class Sale {
     @IsUUID()
     productId: string;
@@ -62,13 +72,4 @@ export class CreateSaleDto {
     sales: Sale[];
 }
 
-class Customer {
-    @IsString()
-    name: string;
 
-    @IsEmail()
-    email: string;
-
-    @IsPhoneNumber()
-    phoneNumber: string;
-}
