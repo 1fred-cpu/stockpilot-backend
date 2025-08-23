@@ -25,6 +25,27 @@ export class BillingController {
         }
     ) {
         const { storeId } = dto;
-        return this.billingService.billingPortal(storeId, );
+        return this.billingService.billingPortal(storeId);
+    }
+    @Post("cancel")
+    async cancelSubcribe(
+        @Body()
+        dto: {
+            storeId: string;
+            cancelAtPeriodEnd: boolean;
+        }
+    ) {
+        return this.billingService.cancelSubcribe(dto);
+    }
+    @Post("change-plan")
+    async changePlan(
+        @Body()
+        dto: {
+            storeId: string;
+            plan: string;
+        }
+    ) {
+        const { storeId, plan } = dto;
+        return this.billingService.changePlan(storeId, plan);
     }
 }

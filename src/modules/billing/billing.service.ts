@@ -134,8 +134,10 @@ export class BillingService {
     }
 
     // POST /api/billing/cancel { cancelAtPeriodEnd?: boolean }
-    async cancelSubscribe(storeId: string, dto: any) {
+    async cancelSubscribe( dto: any) {
         try {
+          
+          const {storeId} = dto
             // 1. Fetch store
             const { data: store, error: fetchError } = await this.supabase
                 .from("stores")
@@ -209,6 +211,78 @@ export class BillingService {
             );
             throw new InternalServerErrorException(
                 "Failed to cancel subscription"
+            );
+        }
+    }
+
+    // POST /api/billing/change-plan { newPriceId }
+    async changePlan(
+        storeId: string,
+        plan: "Starter" | "Growth" | "Enterprise"
+    ) {
+        try {
+            // 1. Fetch store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("*")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    `Error fetching store: ${fetchError.message}`
+                );
+            }
+            if (!store) {
+                throw new NotFoundException("Store not found");
+            }
+            const newPriceId = await this.getPriceId(plan);
+
+            // 3. Fetch subscription
+            const { data: sub, error: subError } = await this.supabase
+                .from("subscriptions")
+                .select("*")
+                .eq("storeId", storeId) // or eq("userId", userId) if you track by user
+                .in("status", ["active", "trialing", "past_due", "incomplete"])
+                .maybeSingle();
+
+            if (subError) {
+                throw new BadRequestException(
+                    `Error fetching subscription: ${subError.message}`
+                );
+            }
+            if (!sub) {
+                throw new NotFoundException("Subscription not found");
+            }
+
+            const stripeSub = await this.stripe.subscriptions.retrieve(
+                sub.stripeSubscriptionId
+            );
+            const itemId = stripeSub.items.data[0].id;
+
+            const updated = await this.stripe.subscriptions.update(
+                sub.stripeSubscriptionId,
+                {
+                    items: [{ id: itemId, price: newPriceId }],
+                    proration_behavior: "create_prorations"
+                }
+            );
+
+            return {
+                status: updated.status,
+                currentPeriodEnd: updated.current_period_end
+            };
+        } catch (error) {
+            if (
+                error instanceof BadRequestException ||
+                error instanceof NotFoundException
+            ) {
+                throw error;
+            }
+
+            this.logger.error(`Error updating subscription: ${error.message}`);
+            throw new InternalServerErrorException(
+                "Failed to update subscription"
             );
         }
     }
