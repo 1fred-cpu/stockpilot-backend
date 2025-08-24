@@ -10,7 +10,7 @@ import {
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { isValidUUID } from '../../../utils/id-validator';
-
+import { Multer } from 'multer';
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name);
@@ -18,36 +18,45 @@ export class StoresService {
   constructor(@Inject('SUPABASE_CLIENT') private readonly supabase: any) {}
 
   /** -------------------- CREATE STORE -------------------- **/
-  async createStore(createStoreDto: CreateStoreDto) {
+  async createStore(createStoreDto: CreateStoreDto, file: Multer.File) {
     try {
       // Check if store already exists for the owner
       const { data: existingStore, error: existsError } = await this.supabase
         .from('stores')
         .select('*')
-        .eq('ownerId', createStoreDto.ownerId)
+        .eq('ownerId', createStoreDto.formData.ownerId)
         .maybeSingle();
 
       if (existsError) {
         this.logger.error(
           `Error checking store existence: ${existsError.message}`,
         );
-        throw new BadRequestException('Could not verify store existence');
+        throw new BadRequestException(
+          existsError.message || 'Could not verify store existence',
+        );
       }
 
       if (existingStore) {
         throw new ConflictException('Store already exists for this owner');
       }
 
+      const logoUrl = await this.uploadFile(
+        file,
+        createStoreDto.formData.storeName,
+      );
+
       // Insert new store
       const { data: newStore, error: createError } = await this.supabase
         .from('stores')
-        .insert([{ ...createStoreDto }])
+        .upsert({ ...createStoreDto.formData, logoUrl })
         .select()
         .maybeSingle();
 
       if (createError) {
         this.logger.error(`Error creating store: ${createError.message}`);
-        throw new BadRequestException('Error creating store');
+        throw new BadRequestException(
+          createError.message || 'Error creating store',
+        );
       }
 
       return { message: 'Store created successfully', store: newStore };
@@ -213,4 +222,28 @@ export class StoresService {
     this.logger.error(`Unexpected error in ${method}: ${error.message}`);
     throw new InternalServerErrorException('An unexpected error occurred');
   }
+
+  async uploadFile(file: Multer.File | null, storeName: string) {
+    if (!file || !storeName) return null;
+    const path = `stores/${storeName}/${Date.now()}_${file.originalname}`;
+
+    const { data, error } = await this.supabase.storage
+      .from('logos') // bucket name
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream',
+      });
+
+    if (error) {
+      throw new BadRequestException(`Error uploading file: ${error.message}`);
+    }
+
+    // If bucket is PUBLIC:
+    const { data: pub } = this.supabase.storage
+      .from('logos')
+      .getPublicUrl(path);
+    return pub.publicUrl;
+  }
 }
+('');
