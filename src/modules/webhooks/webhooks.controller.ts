@@ -1,30 +1,25 @@
 import {
-    Controller,
-    Post,
-    Req,
-    Res,
-    Headers,
-    HttpCode,
-    HttpStatus,
-    Inject
-} from "@nestjs/common";
-import Stripe from "stripe";
-import { WebhooksService } from "./webhooks.service";
-@Controller("stripe")
-export class WebhookController {
-    constructor(
+  Controller,
+  Post,
+  Req,
+  Res,
+  Headers,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { WebhooksService } from './webhooks.service';
+import { Request, Response } from 'express';
+@Controller('stripe')
+export class WebhooksController {
+  constructor(private readonly webhooksService: WebhooksService) {}
 
-        private readonly webhooksService: WebhooksService
-    ) {}
-
-    @Post("webhook")
-    @HttpCode(HttpStatus.OK)
-    async handleStripeWebhook(
-        @Req() req: Request,
-        @Res() res: Response,
-        @Headers("stripe-signature") sig: string
-    ) {
-        return this.webhooksService.stripeWebhook(req, res ,
-        sig);
-    }
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleStripeWebhook(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Headers('stripe-signature') sig: string,
+  ) {
+    return this.webhooksService.stripeWebhook(req, res, sig);
+  }
 }
