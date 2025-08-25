@@ -1,159 +1,172 @@
 import {
-  BadRequestException,
-  Injectable,
-  Inject,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { StockChangeDto } from './dto/stock-change.dto';
-import { MailService } from 'utils/mail/mail.service';
+    BadRequestException,
+    Injectable,
+    Inject,
+    InternalServerErrorException,
+    Logger,
+    NotFoundException
+} from "@nestjs/common";
+import { StockChangeDto } from "./dto/stock-change.dto";
+import { MailService } from "utils/mail/mail.service";
 
 @Injectable()
 export class InventoryService {
-  private logger = new Logger(InventoryService.name);
-  constructor(
-    @Inject('SUPABASE_CLIENT') private readonly supabase: any,
-    private readonly mailService: MailService,
-  ) {}
+    private logger = new Logger(InventoryService.name);
+    constructor(
+        @Inject("SUPABASE_CLIENT") private readonly supabase: any,
+        private readonly mailService: MailService
+    ) {}
 
-  async stockMove(
-    dto: StockChangeDto,
-  ): Promise<{ newStock: number; alertCreated: boolean }> {
-    try {
-      const {
-        inventoryId,
-        change,
-        type,
-        reason = null,
-        referenceId = null,
-        userId = null,
-        idempotencyKey,
-      } = dto;
+    async stockMove(
+        dto: StockChangeDto
+    ): Promise<{ newStock: number; alertCreated: boolean }> {
+        try {
+            const {
+                inventoryId,
+                change,
 
-      // --- 1. Idempotency Check ---
-      if (idempotencyKey) {
-        const { data: existingMovement, error: idempotencyError } =
-          await this.supabase
-            .from('stock_movements')
-            .select('id')
-            .eq('idempotencyKey', idempotencyKey)
-            .maybeSingle();
+                type,
+                reason = null,
+                referenceId = null,
+                userId = null,
+                idempotencyKey
+            } = dto;
 
-        if (idempotencyError) {
-          throw new BadRequestException(
-            `Error checking idempotency: ${idempotencyError.message}`,
-          );
-        }
+            // --- 1. Idempotency Check ---
+            if (idempotencyKey) {
+                const { data: existingMovement, error: idempotencyError } =
+                    await this.supabase
+                        .from("stock_movements")
+                        .select("id")
+                        .eq("idempotencyKey", idempotencyKey)
+                        .maybeSingle();
 
-        if (existingMovement) {
-          const { data: inv, error: invError } = await this.supabase
-            .from('inventories')
-            .select('stock')
-            .eq('id', inventoryId)
-            .maybeSingle();
+                if (idempotencyError) {
+                    throw new BadRequestException(
+                        `Error checking idempotency: ${idempotencyError.message}`
+                    );
+                }
 
-          if (invError) throw new BadRequestException(invError.message);
-          return { newStock: inv.stock, alertCreated: false };
-        }
-      }
+                if (existingMovement) {
+                    const { data: inv, error: invError } = await this.supabase
+                        .from("inventories")
+                        .select("stock")
+                        .eq("id", inventoryId)
+                        .maybeSingle();
 
-      // --- 2. Fetch Inventory Row with Lock ---
-      const { data: inventory, error: invFetchError } = await this.supabase
-        .from('inventories')
-        .select('stock, lowStockThreshold, lastAlertedAt')
-        .eq('id', inventoryId)
-        .maybeSingle();
+                    if (invError)
+                        throw new BadRequestException(invError.message);
+                    return { newStock: inv.stock, alertCreated: false };
+                }
+            }
 
-      if (invFetchError) throw new BadRequestException(invFetchError.message);
-      if (!inventory)
-        throw new NotFoundException(
-          `Inventory with id ${inventoryId} not found`,
-        );
+            // --- 2. Fetch Inventory Row with Lock ---
+            const { data: inventory, error: invFetchError } =
+                await this.supabase
+                    .from("inventories")
+                    .select("stock, lowStockThreshold, lastAlertedAt, storeId")
+                    .eq("id", inventoryId)
+                    .maybeSingle();
 
-      let { stock, lowStockThreshold: threshold, lastAlertedAt } = inventory;
+            if (invFetchError)
+                throw new BadRequestException(invFetchError.message);
+            if (!inventory)
+                throw new NotFoundException(
+                    `Inventory with id ${inventoryId} not found`
+                );
 
-      // --- 3. Prevent Negative Stock ---
-      if (stock + change < 0) {
-        throw new BadRequestException(
-          `Insufficient stock for inventory ${inventoryId}`,
-        );
-      }
+            let {
+                stock,
+                lowStockThreshold: threshold,
+                lastAlertedAt,
+                storeId
+            } = inventory;
 
-      // --- 4. Update Stock ---
-      const newStock = stock + change;
-      const { error: updateError } = await this.supabase
-        .from('inventories')
-        .update({
-          stock: newStock,
-          updatedAt: new Date().toISOString(),
-        })
-        .eq('id', inventoryId);
+            // --- 3. Prevent Negative Stock ---
+            if (stock + change < 0) {
+                throw new BadRequestException(
+                    `Insufficient stock for inventory ${inventoryId}`
+                );
+            }
 
-      if (updateError) throw new BadRequestException(updateError.message);
+            // --- 4. Update Stock ---
+            const newStock = stock + change;
+            const { error: updateError } = await this.supabase
+                .from("inventories")
+                .update({
+                    stock: newStock,
+                    updatedAt: new Date().toISOString()
+                })
+                .eq("id", inventoryId);
 
-      // --- 5. Insert Stock Movement ---
-      const { error: movementError } = await this.supabase
-        .from('stock_movements')
-        .insert({
-          inventoryId,
-          change,
-          type,
-          reason,
-          referenceId,
-          idempotencyKey,
-          createdBy: userId,
-          createdAt: new Date().toISOString(),
-        });
+            if (updateError) throw new BadRequestException(updateError.message);
 
-      if (movementError) throw new BadRequestException(movementError.message);
+            // --- 5. Insert Stock Movement ---
+            const { error: movementError } = await this.supabase
+                .from("stock_movements")
+                .upsert({
+                    inventoryId,
+                    change,
+                    type,
+                    storeId,
+                    reason,
+                    referenceId,
+                    idempotencyKey,
+                    createdBy: userId,
+                    createdAt: new Date().toISOString()
+                });
 
-      // --- 6. Low Stock Alert Logic ---
-      let alertCreated = false;
-      if (newStock <= threshold) {
-        const { error: alertError } = await this.supabase
-          .from('stock_alerts')
-          .insert({
-            inventoryId,
-            stockAtTrigger: newStock,
-            threshold,
-            status: 'pending',
-            triggeredAt: new Date().toISOString(),
-          });
+            if (movementError)
+                throw new BadRequestException(movementError.message);
 
-        if (alertError) throw new BadRequestException(alertError.message);
+            // --- 6. Low Stock Alert Logic ---
+            let alertCreated = false;
+            if (newStock <= threshold) {
+                const { error: alertError } = await this.supabase
+                    .from("stock_alerts")
+                    .upsert({
+                        inventoryId,
+                        stockAtTrigger: newStock,
+                        threshold,
+                        storeId,
+                        status: "pending",
+                        triggeredAt: new Date().toISOString()
+                    });
 
-        // Update lastAlertedAt
-        await this.supabase
-          .from('inventories')
-          .update({ lastAlertedAt: new Date().toISOString() })
-          .eq('id', inventoryId);
+                if (alertError)
+                    throw new BadRequestException(alertError.message);
 
-        alertCreated = true;
-      }
+                // Update lastAlertedAt
+                await this.supabase
+                    .from("inventories")
+                    .update({ lastAlertedAt: new Date().toISOString() })
+                    .eq("id", inventoryId);
 
-      if (alertCreated) {
-        const { data, error } = await this.supabase
-          .from('inventories')
-          .select(`productId, products(storeId,stores(contactEmail))`)
-          .eq('id', inventoryId)
-          .maybeSingle();
+                alertCreated = true;
+            }
 
-        if (error) {
-          throw new BadRequestException(error.message);
-        }
+            if (alertCreated) {
+                const { data, error } = await this.supabase
+                    .from("inventories")
+                    .select(`productId, products(storeId,stores(contactEmail))`)
+                    .eq("id", inventoryId)
+                    .maybeSingle();
 
-        const { data: product, fetcherror } = await this.supabase
-          .from('products')
-          .select('name')
-          .eq('inventoryId', inventoryId)
-          .maybeSingle();
+                if (error) {
+                    throw new BadRequestException(error.message);
+                }
 
-        if (fetcherror) {
-          throw new BadRequestException(error.message);
-        }
+                const { data: product, fetcherror } = await this.supabase
+                    .from("products")
+                    .select("name")
+                    .eq("inventoryId", inventoryId)
+                    .maybeSingle();
 
-        const htmlContent = `
+                if (fetcherror) {
+                    throw new BadRequestException(error.message);
+                }
+
+                const htmlContent = `
 <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
   <div style="max-width: 500px; margin: auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
     <div style="background-color: #2a7ade; padding: 20px; text-align: center; color: #fff;">
@@ -164,7 +177,7 @@ export class InventoryService {
       <h2 style="color: #2a7ade; margin-top: 0;">Inventory Threshold Reached</h2>
       <p>
         We’ve detected that the stock level for ${
-          product.name
+            product.name
         } has reached its alert threshold.
       </p>
       <p>
@@ -182,19 +195,23 @@ export class InventoryService {
 </div>
 `;
 
-        const storeEmail = data.products.stores.contactEmail;
-        await this.mailService.sendMail(storeEmail, 'Stock Alert', htmlContent);
-      }
+                const storeEmail = data.products.stores.contactEmail;
+                await this.mailService.sendMail(
+                    storeEmail,
+                    "Stock Alert",
+                    htmlContent
+                );
+            }
 
-      return { newStock, alertCreated };
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      else if (error instanceof NotFoundException) throw error;
-      this.logger.error('Error processing stock move', error);
-      throw new InternalServerErrorException(
-        'An error occurred while processing the stock move',
-        error.message,
-      );
+            return { newStock, alertCreated };
+        } catch (error) {
+            if (error instanceof BadRequestException) throw error;
+            else if (error instanceof NotFoundException) throw error;
+            this.logger.error("Error processing stock move", error);
+            throw new InternalServerErrorException(
+                "An error occurred while processing the stock move",
+                error.message
+            );
+        }
     }
-  }
 }

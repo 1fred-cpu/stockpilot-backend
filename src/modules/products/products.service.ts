@@ -133,6 +133,7 @@ export class ProductsService {
         storeId,
         variantId: variant.id,
         stock: variants[index].stock,
+        totalStock: variants[index].stock, 
         lowStockThreshold: variants[index].lowStockThreshold,
       }));
 
