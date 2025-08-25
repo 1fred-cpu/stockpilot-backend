@@ -90,6 +90,32 @@ export class StoresService {
       this.handleServiceError(error, 'findStore');
     }
   }
+  /** -------------------- FIND STORE WITH OWNER ID -------------------- **/
+  async findStoreWithOwnerId(ownerId: string) {
+    try {
+      if (!ownerId) {
+        throw new BadRequestException('owner ID is required');
+      }
+      const { data: store, error: fetchError } = await this.supabase
+        .from('stores')
+        .select('*')
+        .eq('ownerId', ownerId)
+        .maybeSingle();
+
+      if (fetchError) {
+        this.logger.error(`Error fetching store: ${fetchError.message}`);
+        throw new InternalServerErrorException('Error fetching store');
+      }
+
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+
+      return store;
+    } catch (error) {
+      this.handleServiceError(error, 'findStore');
+    }
+  }
 
   /** -------------------- UPDATE STORE -------------------- **/
   async updateStore(storeId: string, updateStoreDto: UpdateStoreDto) {

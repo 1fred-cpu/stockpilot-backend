@@ -57,9 +57,17 @@ export class StoresController {
   }
 
   /**
+   * Get a single store by owner ID
+   */
+  @HttpCode(HttpStatus.OK)
+  @Get()
+  async findStoreWithOwnerId(@Query('ownerId') ownerId: string) {
+    return this.storesService.findStoreWithOwnerId(ownerId);
+  }
+  /**
    * Get a single store by ID
    */
-  @HttpCode(200)
+  @HttpCode(HttpStatus.OK)
   @Get(':storeId')
   async findStore(@Param('storeId', ParseUUIDPipe) storeId: string) {
     return this.storesService.findStore(storeId);
