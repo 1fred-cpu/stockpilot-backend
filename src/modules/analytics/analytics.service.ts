@@ -3,9 +3,10 @@ import {
     Inject,
     Logger,
     InternalServerErrorException,
+    NotFoundException,
     BadRequestException
 } from "@nestjs/common";
-
+import { isValidUUID } from "../../../utils/id-validator";
 @Injectable()
 export class AnalyticsService {
     private logger = new Logger(AnalyticsService.name);
@@ -13,6 +14,29 @@ export class AnalyticsService {
 
     async getKPIAnalytics(storeId: string) {
         try {
+            if (!isValidUUID(storeId)) {
+                throw new BadRequestException("Invalid storeId format");
+            }
+
+            // Check if storeId exist with a store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    "Error fetching store",
+                    fetchError
+                );
+            }
+
+            if (!store) {
+                throw new NotFoundException(
+                    "storeId does not exists with a store"
+                );
+            }
             const now = new Date();
             const currentMonthStart = new Date(
                 now.getFullYear(),
@@ -45,7 +69,7 @@ export class AnalyticsService {
             }
 
             const totalSalesCurrentMonth = (currentSales || []).reduce(
-                (sum, s) => sum + (s.total_amount || 0),
+                (sum, s) => sum + (s.totalPrice || 0),
                 0
             );
 
@@ -106,11 +130,15 @@ export class AnalyticsService {
 
             if (lastMonthProductErr) throw lastMonthProductErr;
 
-            /** Change */
-            const percentageChangeProducts =
-                ((totalProductsCurrentMonth - totalProductsLastMonth) /
-                    totalProductsLastMonth) *
-                100;
+            /** %Change */
+            let percentageChangeProducts = 0;
+
+            if (totalProductsLastMonth > 0) {
+                percentageChangeProducts =
+                    ((totalProductsCurrentMonth - totalProductsLastMonth) /
+                        totalProductsLastMonth) *
+                    100;
+            }
 
             // Low Stock Products (threshold = 5 units, or use column if available)
             const { count: lowStockProducts, error: lowStockErr } =
@@ -147,10 +175,13 @@ export class AnalyticsService {
 
             /** % change */
 
-            const percentageChangeCustomers =
-                ((currentMonthCustomers - lastMonthCustomers) /
-                    lastMonthCustomers) *
-                100;
+            let percentageChangeCustomers = 0;
+            if (lastMonthCustomers > 0) {
+                percentageChangeCustomers =
+                    ((currentMonthCustomers - lastMonthCustomers) /
+                        lastMonthCustomers) *
+                    100;
+            }
 
             return {
                 sales: {
@@ -169,6 +200,9 @@ export class AnalyticsService {
                 }
             };
         } catch (error) {
+            if (error instanceof NotFoundException || BadRequestException) {
+                throw error;
+            }
             this.logger.error("Error fetching KPI analytics", error);
             throw new InternalServerErrorException(
                 "Failed to fetch KPI analytics"
@@ -178,6 +212,29 @@ export class AnalyticsService {
 
     async getSalesTrendLast30days(storeId: string) {
         try {
+            if (!isValidUUID(storeId)) {
+                throw new BadRequestException("Invalid storeId format");
+            }
+            // Check if storeId exist with a store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    "Error fetching store",
+                    fetchError
+                );
+            }
+
+            if (!store) {
+                throw new NotFoundException(
+                    "storeId does not exists with a store"
+                );
+            }
+
             const today = new Date();
             const startDate = new Date();
             startDate.setDate(today.getDate() - 30);
@@ -216,7 +273,7 @@ export class AnalyticsService {
 
             return result;
         } catch (error) {
-            if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException || NotFoundException) {
                 throw error;
             }
             this.logger.error(
@@ -230,6 +287,29 @@ export class AnalyticsService {
 
     async getTopSellingProducts(storeId: string) {
         try {
+            if (!isValidUUID(storeId)) {
+                throw new BadRequestException("Invalid storeId format");
+            }
+
+            // Check if storeId exist with a store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    "Error fetching store",
+                    fetchError
+                );
+            }
+
+            if (!store) {
+                throw new NotFoundException(
+                    "storeId does not exists with a store"
+                );
+            }
             const today = new Date();
             const firstDayOfMonth = new Date(
                 today.getFullYear(),
@@ -250,7 +330,7 @@ export class AnalyticsService {
 
             if (error) throw new BadRequestException(error.message);
 
-            if (data.length === 0) {
+       if (data.length === 0) {
                 return [];
             }
 
@@ -279,7 +359,7 @@ export class AnalyticsService {
 
             return result;
         } catch (error) {
-            if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException || NotFoundException) {
                 throw error;
             }
             this.logger.error(`Error fetching Top Selling Products: ${error}`);
@@ -291,6 +371,29 @@ export class AnalyticsService {
 
     async getInventoryStatusByCategory(storeId: string) {
         try {
+            if (!isValidUUID(storeId)) {
+                throw new BadRequestException("Invalid storeId format");
+            }
+            // Check if storeId exist with a store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    "Error fetching store",
+                    fetchError
+                );
+            }
+
+            if (!store) {
+                throw new NotFoundException(
+                    "storeId does not exists with a store"
+                );
+            }
+
             const { data, error } = await this.supabase
                 .from("inventories")
                 .select("productId, products(category), stock, totalStock")
@@ -326,7 +429,7 @@ export class AnalyticsService {
 
             return Object.values(categoryMap);
         } catch (error) {
-            if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException || NotFoundException) {
                 throw error;
             }
 
@@ -338,6 +441,29 @@ export class AnalyticsService {
     }
     async getLatestSales(storeId: string) {
         try {
+            if (!isValidUUID(storeId)) {
+                throw new BadRequestException("Invalid storeId format");
+            }
+
+            // Check if storeId exist with a store
+            const { data: store, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("id")
+                .eq("id", storeId)
+                .maybeSingle();
+
+            if (fetchError) {
+                throw new BadRequestException(
+                    "Error fetching store",
+                    fetchError
+                );
+            }
+
+            if (!store) {
+                throw new NotFoundException(
+                    "storeId does not exists with a store"
+                );
+            }
             const { data, error } = await this.supabase
                 .from("sales")
                 .select(
@@ -365,7 +491,7 @@ export class AnalyticsService {
                 status: row.status
             }));
         } catch (error) {
-            if (error instanceof BadRequestException) {
+            if (error instanceof BadRequestException || NotFoundException) {
                 throw error;
             }
 
