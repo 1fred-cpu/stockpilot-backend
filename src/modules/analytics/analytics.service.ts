@@ -1,11 +1,14 @@
 import {
   Injectable,
   Inject,
+  Logger,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 
 @Injectable()
 export class AnalyticsService {
+  private logger = new Logger(AnalyticsService.name);
   constructor(@Inject('SUPABASE_CLIENT') private readonly supabase: any) {}
 
   async getKPIAnalytics(storeId: string) {
@@ -36,7 +39,9 @@ export class AnalyticsService {
         .gte('createdAt', currentMonthStart)
         .lte('createdAt', now.toISOString());
 
-      if (currentSalesErr) throw currentSalesErr;
+      if (currentSalesErr) {
+        throw currentSalesErr;
+      }
 
       const totalSalesCurrentMonth = (currentSales || []).reduce(
         (sum, s) => sum + (s.total_amount || 0),
@@ -159,8 +164,112 @@ export class AnalyticsService {
         },
       };
     } catch (error) {
-      console.error('AnalyticsService Error:', error.message || error);
-      throw new InternalServerErrorException('Failed to fetch analytics');
+      this.logger.error('Error fetching KPI analytics', error);
+      throw new InternalServerErrorException('Failed to fetch KPI analytics');
+    }
+  }
+
+  async getSalesTrendLast30days(storeId: string) {
+    try {
+      const today = new Date();
+      const startDate = new Date();
+      startDate.setDate(today.getDate() - 30);
+
+      // Query sales from Supabase
+      const { data, error } = await this.supabase
+        .from('sales')
+        .select('totalPrice, createdAt')
+        .eq('storeId', storeId)
+        .gte('createdAt', startDate.toISOString())
+        .lte('createdAt', today.toISOString());
+
+      if (error) throw new BadRequestException(error.message);
+
+      // Group sales by date
+      const salesByDate: Record<string, number> = {};
+
+      for (const row of data) {
+        const date = new Date(row.createdAt).toISOString().split('T')[0]; // YYYY-MM-DD
+        salesByDate[date] = (salesByDate[date] || 0) + row.totalPrice;
+      }
+
+      // Ensure all last 30 days are included (even if sales = 0)
+      const result: { date: string; sales: number }[] = [];
+      for (let i = 0; i <= 30; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        result.push({
+          date: dateStr,
+          sales: salesByDate[dateStr] || 0,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error fetching Sales Trend Last 30 days analytics: ${error}`,
+      );
+      throw new InternalServerErrorException(
+        'Failed to fetch Sales Trend Last 30 days analytics',
+      );
+    }
+  }
+
+  async getTopSellingProducts(storeId: string) {
+    try {
+      const today = new Date();
+      const firstDayOfMonth = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1,
+      );
+
+      // Fetch current month sales
+      const { data, error } = await this.supabase
+        .from('sales')
+        .select('productId, products(name), quantity, totalPrice, createdAt')
+        .eq('storeId', storeId)
+        .gte('createdAt', firstDayOfMonth.toISOString())
+        .lte('createdAt', today.toISOString());
+
+      if (error) throw new BadRequestException(error.message);
+
+      // Aggregate by product
+      const productMap: Record<
+        string,
+        { name: string; sales: number; revenue: number }
+      > = {};
+
+      for (const row of data) {
+        if (!productMap[row.products.name]) {
+          productMap[row.products.name] = {
+            name: row.products.name,
+            sales: 0,
+            revenue: 0,
+          };
+        }
+        productMap[row.products.name].sales += row.quantity;
+        productMap[row.products.name].revenue += row.totalPrice;
+      }
+
+      // Sort by units sold (desc)
+      const result = Object.values(productMap).sort(
+        (a, b) => b.sales - a.sales,
+      );
+
+      return result;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Error fetching Top Selling Products: ${error}`);
+      throw new InternalServerErrorException(
+        'Failed to fetch Top Selling Products analytics',
+      );
     }
   }
 }
