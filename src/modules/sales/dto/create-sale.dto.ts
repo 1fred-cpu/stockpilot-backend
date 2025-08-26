@@ -9,6 +9,7 @@ import {
     IsEmail,
     IsArray,
     IsPhoneNumber,
+    IsNotEmpty,
     ValidateNested
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -41,10 +42,6 @@ export class Sale {
     @IsNumber()
     @Min(0)
     totalPrice: number;
-    //
-    //     @IsOptional()
-    //     @IsString()
-    //     customer?: string;
 
     @IsUUID()
     inventoryId: string;
@@ -53,7 +50,12 @@ export class Sale {
     idempotencyKey: string;
 
     @IsString()
+    @IsNotEmpty()
     type: string;
+
+    @IsString()
+    @IsNotEmpty()
+    status: string;
 
     @IsObject()
     customer: Customer;
@@ -71,5 +73,3 @@ export class CreateSaleDto {
     @Type(() => Sale)
     sales: Sale[];
 }
-
-

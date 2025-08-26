@@ -133,6 +133,7 @@ export class ProductsService {
         storeId,
         variantId: variant.id,
         stock: variants[index].stock,
+        reserved: variants[index].reserved,
         totalStock: variants[index].stock, 
         lowStockThreshold: variants[index].lowStockThreshold,
       }));
@@ -206,7 +207,7 @@ export class ProductsService {
   async getProducts(
     storeId: string,
     filter?: Filter,
-    limit = 10,
+    limit = 100,
     sort: 'asc' | 'desc' = 'desc',
     category?: string,
   ) {

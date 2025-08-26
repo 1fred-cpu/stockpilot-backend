@@ -104,7 +104,7 @@ export class SalesService {
                 const { data: newSale, error: createError } =
                     await this.supabase
                         .from("sales")
-                        .insert({
+                        .upsert({
                             ...sale,
                             storeId,
                             customer: sale.customer.name,
@@ -138,14 +138,14 @@ export class SalesService {
                 if (!existsCustomer) {
                     const { error: customerError } = await this.supabase
                         .from("customers")
-                        .insert([
+                        .upsert(
                             {
                                 storeId: createSaleDto.storeId,
                                 name: sale.customer.name,
                                 email: sale.customer.email,
                                 phoneNumber: sale.customer.phoneNumber
                             }
-                        ]);
+                        );
                     if (customerError) {
                         throw new BadRequestException(`Error creating customer:
                       ${customerError.message}`);

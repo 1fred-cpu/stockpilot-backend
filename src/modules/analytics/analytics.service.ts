@@ -416,7 +416,7 @@ export class AnalyticsService {
             > = {};
 
             for (const row of data) {
-                if (!categoryMap[row.prosucts.category]) {
+                if (!categoryMap[row.products.category]) {
                     categoryMap[row.products.category] = {
                         category: row.products.category,
                         stock: 0,
