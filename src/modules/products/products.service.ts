@@ -134,7 +134,7 @@ export class ProductsService {
         variantId: variant.id,
         stock: variants[index].stock,
         reserved: variants[index].reserved,
-        totalStock: variants[index].stock, 
+        totalStock: variants[index].stock,
         lowStockThreshold: variants[index].lowStockThreshold,
       }));
 
@@ -264,7 +264,7 @@ export class ProductsService {
       for (const product of products) {
         const { data: variants, error: variantsError } = await this.supabase
           .from('variants')
-          .select('*')
+          .select('*, inventories(stock, lowStockThreshold)')
           .eq('productId', product.id);
 
         if (variantsError) {

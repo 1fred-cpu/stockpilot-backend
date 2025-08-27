@@ -57,12 +57,14 @@ export class StoresController {
   }
 
   /**
-   * Get a single store by owner ID
+   * Get a store products categories by store ID
    */
   @HttpCode(HttpStatus.OK)
-  @Get()
-  async findStoreWithOwnerId(@Query('ownerId') ownerId: string) {
-    return this.storesService.findStoreWithOwnerId(ownerId);
+  @Get(':storeId/categories')
+  async getStoreProductsCategories(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+  ) {
+    return this.storesService.getStoreProductsCategories(storeId);
   }
   /**
    * Get a single store by ID

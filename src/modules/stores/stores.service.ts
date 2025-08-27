@@ -230,6 +230,37 @@ export class StoresService {
       );
     }
   }
+
+  async getStoreProductsCategories(storeId: string) {
+    try {
+      if (!isValidUUID(storeId)) {
+        throw new BadRequestException('Invalid store ID format');
+      }
+
+      const { data, error } = await this.supabase
+        .from('categories')
+        .select('categories')
+        .eq('storeId', storeId)
+        .maybeSingle();
+
+      if (error) {
+        this.logger.error(
+          `Error fetching product categories: ${error.message}`,
+        );
+        throw new InternalServerErrorException(
+          'Error fetching product categories',
+        );
+      }
+
+      if (!data) {
+        throw new NotFoundException('No categories found');
+      }
+
+      return data.categories;
+    } catch (error) {
+      this.handleServiceError(error, 'getStoreProductsCategories');
+    }
+  }
   /** -------------------- HELPER METHODS -------------------- **/
   private validateUUID(id: string, label: string) {
     if (!isValidUUID(id)) {

@@ -76,11 +76,9 @@ export class Variant {
   @IsNotEmpty()
   price: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    lowStockThreshold: number;
-    
-
+  @IsNumber()
+  @IsNotEmpty()
+  lowStockThreshold: number;
 
   @IsNumber()
   @IsNotEmpty()
