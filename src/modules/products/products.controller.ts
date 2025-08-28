@@ -7,12 +7,20 @@ import {
     Param,
     Delete,
     ValidationPipe,
-    Query
+    Query,
+    UploadedFiles,
+    UploadedFile,
+    UseInterceptors
 } from "@nestjs/common";
+import {
+    FileFieldsInterceptor,
+    FileInterceptor
+} from "@nestjs/platform-express";
 import { ProductsService } from "./products.service";
 import { CreateProductDto, Variant } from "./dto/create-product.dto";
 import { UpdateProductDto } from "./dto/update-product.dto";
 import { Filter } from "types/filter";
+import { Multer } from "multer";
 
 @Controller("stores/:storeId/products")
 export class ProductsController {
@@ -20,23 +28,39 @@ export class ProductsController {
 
     /** Create a new product */
     @Post()
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: "thumbnail", maxCount: 1 },
+            { name: "variantImages", maxCount: 20 }
+        ])
+    )
     async createProduct(
         @Param("storeId") storeId: string,
-        @Body(ValidationPipe) createProductDto: CreateProductDto
+        @Body(ValidationPipe) createProductDto: CreateProductDto,
+        @UploadedFiles()
+        files: {
+            thumbnail: Multer.File[];
+            variantImages: Multer.File[];
+        }
     ) {
-        return this.productsService.createProduct({
-            ...createProductDto,
-            storeId
-        });
+        return this.productsService.createProduct(
+            {
+                ...createProductDto,
+                storeId
+            },
+            files
+        );
     }
 
     /** Add a new variant to an existing product */
     @Post(":productId/variants")
+    @UseInterceptors(FileInterceptor("variantImage"))
     async addProductVariant(
         @Param("productId") productId: string,
-        @Body(ValidationPipe) variant: Variant
+        @Body(ValidationPipe) variant: Variant,
+        @UploadedFile() file: Multer.File
     ) {
-        return this.productsService.addProductVariant(productId, variant);
+        return this.productsService.addProductVariant(productId, variant, file);
     }
 
     /** Get products for a store */
@@ -64,13 +88,13 @@ export class ProductsController {
     }
 
     /** Get all variants for a product */
-//     @Get(":productId/variants")
-//     async getProductVariants(
-//         @Param("storeId") storeId: string,
-//         @Param("productId") productId: string
-//     ) {
-//         return this.productsService.getProductVariants(storeId, productId);
-//     }
+    //     @Get(":productId/variants")
+    //     async getProductVariants(
+    //         @Param("storeId") storeId: string,
+    //         @Param("productId") productId: string
+    //     ) {
+    //         return this.productsService.getProductVariants(storeId, productId);
+    //     }
 
     /** Update an existing product */
     @Patch(":productId")
