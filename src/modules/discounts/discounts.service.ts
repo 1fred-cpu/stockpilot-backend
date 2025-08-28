@@ -2,7 +2,7 @@ import {
     Injectable,
     Logger,
     Inject,
-    ConflictExeception,
+    ConflictException,
     BadRequestException,
     InternalServerErrorException,
     NotFoundException
@@ -24,7 +24,10 @@ export class DiscountsService {
                 await this.supabase
                     .from("discounts")
                     .select("id")
-                    .eq("name", createDiscountDto.name)
+                    .match({
+                        name: createDiscountDto.name,
+                        storeId: createDiscountDto.storeId
+                    })
                     .maybeSingle();
 
             if (existsDiscountError) {
@@ -32,7 +35,7 @@ export class DiscountsService {
               ${existsDiscountError.message}`);
             }
             if (existsDiscount) {
-                throw new ConflictExeception("Discount already exists");
+                throw new ConflictException("Discount already exists");
             }
 
             // 3. Create new Discount
@@ -174,7 +177,7 @@ export class DiscountsService {
     errorHandler(error: any, message: string) {
         if (
             error instanceof BadRequestException ||
-            ConflictExeception ||
+            ConflictException ||
             NotFoundException
         )
             throw error;
@@ -189,5 +192,112 @@ export class DiscountsService {
             throw new BadRequestException(`Invalid format of ${field}`);
         }
         return;
+    }
+
+    /**
+     * Apply discounts to products with variants.
+     * @param storeId string
+     * @param products Array of products { id, categoryId, variants: [{ id, price }] }
+     */
+    async applyDiscounts(storeId: string, products: any[]): Promise<any[]> {
+        try {
+            const now = new Date();
+
+            // 1. Fetch all active discounts for the store
+            const { data: discounts, error } = await this.supabase
+                .from("discounts")
+                .select("*")
+                .eq("storeId", storeId)
+                .eq("isActive", true);
+
+            if (error) throw new BadRequestException(error.message);
+
+            // Filter valid discounts
+            const validDiscounts = (discounts || []).filter(d => {
+                return (
+                    new Date(d.startDate) <= now && new Date(d.endDate) >= now
+                );
+            });
+
+            // 2. Apply discount logic to each product & its variants
+            return products.map(product => {
+                // Find applicable discount for the product
+                const productDiscount = validDiscounts.find(
+                    d => d.type === "product" && d.productId === product.id
+                );
+                const categoryDiscount = validDiscounts.find(
+                    d =>
+                        d.type === "category" &&
+                        d.categoryId === product.categoryId
+                );
+                const storeDiscount = validDiscounts.find(
+                    d => d.type === "store"
+                );
+
+                // Pick discount priority: product > category > store
+                let applicableDiscount =
+                    productDiscount ||
+                    categoryDiscount ||
+                    storeDiscount ||
+                    null;
+
+                // Process each variant
+                const variants = (product.variants || []).map(variant => {
+                    let finalPrice = variant.price;
+                    let discountApplied = 0;
+
+                    if (applicableDiscount) {
+                        if (applicableDiscount.discountType === "percentage") {
+                            discountApplied =
+                                (variant.price * applicableDiscount.value) /
+                                100;
+                        } else if (
+                            applicableDiscount.discountType === "fixed"
+                        ) {
+                            discountApplied = applicableDiscount.value;
+                        }
+
+                        // Min order check
+                        if (
+                            applicableDiscount.minOrderAmount &&
+                            variant.price < applicableDiscount.minOrderAmount
+                        ) {
+                            discountApplied = 0; // ignore discount
+                        }
+
+                        finalPrice = Math.max(
+                            0,
+                            variant.price - discountApplied
+                        );
+                    }
+
+                    return {
+                        ...variant,
+                        originalPrice: variant.price,
+                        finalPrice,
+                        discountApplied,
+                        hasDiscount: discountApplied > 0,
+                        discount:
+                            discountApplied > 0
+                                ? {
+                                      id: applicableDiscount.id,
+                                      name: applicableDiscount.name,
+                                      type: applicableDiscount.type,
+                                      discountType:
+                                          applicableDiscount.discountType,
+                                      value: applicableDiscount.value
+                                  }
+                                : null
+                    };
+                });
+
+                return {
+                    ...product,
+                    variants // variants now contain discount info
+                };
+            });
+        } catch (error) {
+            this.errorHandler(error, "Failed to apply discounts");
+        }
     }
 }

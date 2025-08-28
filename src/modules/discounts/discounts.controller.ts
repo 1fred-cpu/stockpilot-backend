@@ -35,7 +35,7 @@ export class DiscountsController {
         return this.discountsService.findDiscount(discountId);
     }
 
-    @HttpCode(HttpStatus.UPDATED)
+    @HttpCode(HttpStatus.OK)
     @Patch(":discountId")
     updateDiscount(
         @Param("discountId") discountId: string,
