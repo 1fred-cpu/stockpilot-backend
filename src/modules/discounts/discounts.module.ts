@@ -3,8 +3,9 @@ import { DiscountsService } from "./discounts.service";
 import { DiscountsController } from "./discounts.controller";
 import { SupabaseModule } from "../../../lib/supabase.module";
 @Module({
-  imports:[SupabaseModule],
+    imports: [SupabaseModule],
     controllers: [DiscountsController],
-    providers: [DiscountsService]
+    providers: [DiscountsService],
+    exports: [DiscountsService]
 })
 export class DiscountsModule {}
