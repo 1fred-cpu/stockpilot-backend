@@ -7,8 +7,9 @@ import {
     NotFoundException
 } from "@nestjs/common";
 import { StockChangeDto } from "./dto/stock-change.dto";
+import { RestockChangeDto } from "./dto/restock-change.dto";
 import { MailService } from "utils/mail/mail.service";
-
+import { isValidUUID } from "../../../utils/id-validator";
 @Injectable()
 export class InventoryService {
     private logger = new Logger(InventoryService.name);
@@ -24,13 +25,14 @@ export class InventoryService {
             const {
                 inventoryId,
                 change,
-
                 type,
                 reason = null,
                 referenceId = null,
                 userId = null,
                 idempotencyKey
             } = dto;
+
+            
 
             // --- 1. Idempotency Check ---
             if (idempotencyKey) {
@@ -64,7 +66,9 @@ export class InventoryService {
             const { data: inventory, error: invFetchError } =
                 await this.supabase
                     .from("inventories")
-                    .select("stock, lowStockThreshold, lastAlertedAt, storeId")
+                    .select(
+                        "stock, lowStockThreshold, lastAlertedAt, storeId,totalStock"
+                    )
                     .eq("id", inventoryId)
                     .maybeSingle();
 
@@ -79,14 +83,20 @@ export class InventoryService {
                 stock,
                 lowStockThreshold: threshold,
                 lastAlertedAt,
-                storeId
+                storeId,
+                totalStock
             } = inventory;
-
+            
+            let tStock= totalStock;
             // --- 3. Prevent Negative Stock ---
             if (stock + change < 0) {
                 throw new BadRequestException(
                     `Insufficient stock for inventory ${inventoryId}`
                 );
+            }
+
+            if (change > 0) {
+                tStock = totalStock + change;
             }
 
             // --- 4. Update Stock ---
@@ -95,6 +105,7 @@ export class InventoryService {
                 .from("inventories")
                 .update({
                     stock: newStock,
+                    totalStock: tStock,
                     updatedAt: new Date().toISOString()
                 })
                 .eq("id", inventoryId);
@@ -205,11 +216,57 @@ export class InventoryService {
 
             return { newStock, alertCreated };
         } catch (error) {
-            if (error instanceof BadRequestException) throw error;
-            else if (error instanceof NotFoundException) throw error;
+            if (error instanceof BadRequestException || NotFoundException)
+                throw error;
+
             this.logger.error("Error processing stock move", error);
             throw new InternalServerErrorException(
                 "An error occurred while processing the stock move",
+                error.message
+            );
+        }
+    }
+
+    async restockMove(restockChangeDto: RestockChangeDto) {
+        try {
+            if (!isValidUUID(restockChangeDto.storeId)) {
+                throw new BadRequestException("Invalid format of storeId");
+            }
+
+            const { data: existsStore, error: existsStoreError } =
+                await this.supabase
+                    .from("stores")
+                    .select("id")
+                    .eq("id", restockChangeDto.storeId)
+                    .maybeSingle();
+            if (existsStoreError) {
+                throw new BadRequestException(`Error checking store existence:
+              ${existsStoreError.message}`);
+            }
+
+            if (!existsStore) {
+                throw new NotFoundException("Store not found");
+            }
+
+            for (const stockChange of restockChangeDto.changes) {
+                await this.stockMove({
+                    inventoryId: stockChange.inventoryId,
+                    change: stockChange.change,
+                    type: stockChange.type,
+                    reason: stockChange.reason || undefined,
+                    referenceId: stockChange.referenceId || undefined,
+                    userId: stockChange.userId || undefined,
+                    idempotencyKey: stockChange.idempotencyKey
+                });
+            }
+            return { message: "Restocked products successfully" };
+        } catch (error) {
+            if (error instanceof BadRequestException || NotFoundException)
+                throw error;
+
+            this.logger.error("Error processing restock move", error);
+            throw new InternalServerErrorException(
+                "An error occurred while processing the restock move",
                 error.message
             );
         }
