@@ -1,94 +1,111 @@
 import {
-    IsString,
-    IsNotEmpty,
-    IsArray,
-    IsNumber,
-    IsObject,
-    IsUrl,
-    IsOptional
-} from "class-validator";
-
-export class CreateProductDto {
-    @IsString()
-    @IsNotEmpty()
-    storeId: string;
-
-    @IsString()
-    @IsNotEmpty()
-    storeName: string;
-
-    @IsString()
-    @IsNotEmpty()
-    name: string;
-
-    @IsString()
-    @IsNotEmpty()
-    brand: string;
-
-    @IsString()
-    @IsNotEmpty()
-    category: string;
-
-    @IsString()
-    @IsNotEmpty()
-    description: string;
-
-    thumbnail: any;
-
-    @IsArray()
-    @IsNotEmpty()
-    tags: string[];
-
-    @IsOptional()
-    @IsObject()
-    attributes: Record<string, any>;
-
-    @IsArray()
-    variants: Variant[];
-}
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsOptional,
+  IsObject,
+  ValidateNested,
+  IsNumber,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class Variant {
-    @IsOptional()
-    @IsString()
-    @IsNotEmpty()
-    productId: string;
+  @IsString()
+  @IsNotEmpty()
+  color: string;
 
-    //    @IsUrl()
-    //     imageUrl: string;
+  @IsString()
+  @IsNotEmpty()
+  size: string;
 
-    @IsString()
-    @IsNotEmpty()
-    color: string;
+  @IsString()
+  @IsNotEmpty()
+  weight: string;
 
-    @IsString()
-    @IsNotEmpty()
-    size: string;
+  @IsString()
+  @IsNotEmpty()
+  dimensions: string;
 
-    @IsString()
-    @IsNotEmpty()
-    weight: string;
+  @IsNumber()
+  stock: number;
 
-    @IsString()
-    @IsNotEmpty()
-    dimensions: string;
+  @IsNumber()
+  price: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    stock: number;
+  @IsNumber()
+  lowStockThreshold: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    price: number;
+  @IsNumber()
+  reserved: number;
 
-    @IsNumber()
-    @IsNotEmpty()
-    lowStockThreshold: number;
+  @IsString()
+  @IsNotEmpty()
+  sku: string;
+}
 
-    @IsNumber()
-    @IsNotEmpty()
-    reserved: number;
+export class CreateProductDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsString()
-    @IsNotEmpty()
-    sku: string;
+  @IsString()
+  @IsNotEmpty()
+  storeName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  brand: string;
+
+  @IsString()
+  @IsNotEmpty()
+  category: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+
+  // ✅ Convert JSON string → array
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  tags: string[];
+
+  // ✅ Convert JSON string → object
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+    }
+    return value;
+  })
+  @IsOptional()
+  @IsObject()
+  attributes: Record<string, any>;
+
+  // ✅ Convert JSON string → array of Variant objects
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Variant)
+  variants: Variant[];
 }
