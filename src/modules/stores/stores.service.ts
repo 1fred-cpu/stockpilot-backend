@@ -252,9 +252,8 @@ export class StoresService {
 
       const { data, error } = await this.supabase
         .from('categories')
-        .select('categories')
-        .eq('storeId', storeId)
-        .maybeSingle();
+        .select('name')
+        .eq('storeId', storeId);
 
       if (error) {
         this.logger.error(
@@ -265,11 +264,11 @@ export class StoresService {
         );
       }
 
-      if (!data) {
+      if (!data || data.length === 0) {
         throw new NotFoundException('No categories found');
       }
 
-      return data.categories;
+      return data.map((category) => category.name);
     } catch (error) {
       this.handleServiceError(error, 'getStoreProductsCategories');
     }
