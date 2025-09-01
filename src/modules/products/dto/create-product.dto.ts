@@ -1,62 +1,59 @@
 import {
-  IsString,
-  IsNotEmpty,
-  IsArray,
-  IsOptional,
-  IsObject,
-  ValidateNested,
-  IsNumber,
-} from 'class-validator';
-import { Type, Transform } from 'class-transformer';
-import { Multer } from 'multer';
+    IsString,
+    IsNotEmpty,
+    IsArray,
+    IsOptional,
+    IsObject,
+    ValidateNested,
+    IsNumber
+} from "class-validator";
+import { Type, Transform } from "class-transformer";
+import { Multer } from "multer";
+
 export class Variant {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  id: string;
+    @IsOptional()
+    @IsString()
+    id?: string;
 
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  inventoryId: string;
+    @IsOptional()
+    @IsString()
+    inventoryId?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  color: string;
+    @IsString()
+    @IsNotEmpty()
+    color: string;
 
-  @IsString()
-  @IsNotEmpty()
-  size: string;
+    @IsString()
+    @IsNotEmpty()
+    size: string;
 
-  @IsString()
-  @IsNotEmpty()
-  weight: string;
+    @IsString()
+    @IsNotEmpty()
+    weight: string;
 
-  @IsString()
-  @IsNotEmpty()
-  dimensions: string;
+    @IsString()
+    @IsNotEmpty()
+    dimensions: string;
 
-  @IsNumber()
-  stock: number;
+    @IsNumber()
+    stock: number;
 
-  @IsNumber()
-  price: number;
+    @IsNumber()
+    price: number;
 
-  @IsNumber()
-  lowStockThreshold: number;
+    @IsNumber()
+    lowStockThreshold: number;
 
-  @IsNumber()
-  reserved: number;
+    @IsNumber()
+    reserved: number;
 
-  @IsString()
-  @IsNotEmpty()
-  sku: string;
+    @IsString()
+    @IsNotEmpty()
+    sku: string;
 
-  @IsOptional()
-  imageFile: Multer.File;
-}
-
-export class CreateProductDto {
+    @IsOptional()
+    imageFile?: Multer.File;
+}export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -77,7 +74,6 @@ export class CreateProductDto {
   @IsNotEmpty()
   description: string;
 
-  // ✅ Convert JSON string → array
   @Transform(({ value }) => {
     if (typeof value === 'string') {
       try {
@@ -91,7 +87,6 @@ export class CreateProductDto {
   @IsArray()
   tags: string[];
 
-  // ✅ Convert JSON string → object
   @Transform(({ value }) => {
     if (typeof value === 'string') {
       try {
@@ -104,9 +99,8 @@ export class CreateProductDto {
   })
   @IsOptional()
   @IsObject()
-  attributes: Record<string, any>;
+  attributes?: Record<string, any>;
 
-  // ✅ Convert JSON string → array of Variant objects
   @Transform(({ value }) => {
     if (typeof value === 'string') {
       try {
@@ -122,3 +116,4 @@ export class CreateProductDto {
   @Type(() => Variant)
   variants: Variant[];
 }
+
