@@ -398,6 +398,7 @@ export class ProductsService {
   /** Update product */
   async updateProduct(productId: string, updateProductDto: UpdateProductDto) {
     try {
+      let categoryId;
       this.validateUUID(productId, 'product ID');
       const product = (await this.findProduct(productId)).product;
 
@@ -423,11 +424,58 @@ export class ProductsService {
         updateProductDto.thumbnail = newThumbnailUrl;
       }
 
+      // Check if category needs to be change
+      if (updateProductDto.category) {
+        // Check if category already exists
+
+        const { data: categoryData, error: categoryDataError } =
+          await this.supabase
+            .from('categories')
+            .select('id')
+            .eq('name', updateProductDto.category)
+            .maybeSingle();
+        if (categoryDataError) {
+          throw new BadRequestException(
+            `Supabase Error fetching category Data: ${categoryDataError.message}`,
+          );
+        }
+
+        // Create a category if not exists
+        if (!categoryData) {
+          const { data: categoryData, error: categoryDataError } =
+            await this.supabase
+              .from('categories')
+              .insert([
+                {
+                  name: updateProductDto.category,
+                  storeId: updateProductDto.storeId,
+                },
+              ])
+              .select();
+          if (categoryDataError) {
+            throw new BadRequestException(
+              `Supabase Error vreating category Data: ${categoryDataError.message}`,
+            );
+          }
+
+          // update the categoryId
+          categoryId = categoryData[0].id;
+        }
+
+        // update the categoryId
+        categoryId = categoryData.id;
+      }
+
       // Update the product fields
       const { data: updatedProduct, error: updateError } = await this.supabase
         .from('products')
         .update({
-          ...updateProductDto,
+          name: updateProductDto.name,
+          brand: updateProductDto.brand,
+          description: updateProductDto.description,
+          tags: updateProductDto.tags,
+          categoryId,
+          attributes: updateProductDto.attributes,
           slug: updatedSlug,
           updatedAt: new Date(),
         })
