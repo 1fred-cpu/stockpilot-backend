@@ -263,7 +263,7 @@ export class ProductsService {
 
             const { data: variants, error: variantsError } = await this.supabase
                 .from("variants")
-                .select("*, inventories(stock,lowStockThreshold, reserved)")
+                .select("*, inventories(stock,lowStockThreshold,reserved)")
                 .eq("productId", productId);
 
             if (variantsError) {

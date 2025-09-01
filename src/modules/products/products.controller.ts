@@ -126,65 +126,70 @@ export class ProductsController {
             { name: "variantImages", maxCount: 20 }
         ])
     )
-  async updateProduct(
-    @Param("productId") productId: string,
-    @Param("storeId") storeId: string,
-    @Body(new ValidationPipe({ transform: true }))
-    updateProductDto: UpdateProductDto,
-    @UploadedFiles()
-    files: {
-      thumbnail?: Multer.File[];
-      variantImages?: Multer.File[];
-    }
-  ) {
-    try {
-      // ✅ Parse JSON fields (tags, attributes, variants, variantsToDelete)
-      const parsedTags =
-        typeof updateProductDto.tags === "string"
-          ? JSON.parse(updateProductDto.tags)
-          : updateProductDto.tags || [];
-
-      const parsedAttributes =
-        typeof updateProductDto.attributes === "string"
-          ? JSON.parse(updateProductDto.attributes)
-          : updateProductDto.attributes;
-
-      const parsedVariants =
-        typeof updateProductDto.variants === "string"
-          ? JSON.parse(updateProductDto.variants)
-          : updateProductDto.variants;
-
-      const parsedVariantsToDelete =
-        typeof updateProductDto.variantsToDelete === "string"
-          ? JSON.parse(updateProductDto.variantsToDelete)
-          : updateProductDto.variantsToDelete || [];
-
-      // ✅ Attach images to variants by index
-      const variantsWithImages = parsedVariants?.map((variant, index) => {
-        if (files.variantImages?.[index]) {
-          variant.imageFile = files.variantImages[index];
+    async updateProduct(
+        @Param("productId") productId: string,
+        @Param("storeId") storeId: string,
+        @Body(new ValidationPipe({ transform: true }))
+        updateProductDto: UpdateProductDto,
+        @UploadedFiles()
+        files: {
+            thumbnail?: Multer.File[];
+            variantImages?: Multer.File[];
         }
-        return variant;
-      }) || [];
+    ) {
+        try {
+            // ✅ Parse JSON fields (tags, attributes, variants, variantsToDelete)
 
-      // ✅ Final product payload
-      const productPayload = {
-        ...updateProductDto,
-        storeId,
-        tags: parsedTags,
-        attributes: parsedAttributes,
-        variants: variantsWithImages,
-        variantsToDelete: parsedVariantsToDelete,
-        thumbnail: files.thumbnail?.[0] ?? null
-      };
+            const thumbnail = files?.thumbnail?.[0] ?? null;
+            const parsedTags =
+                typeof updateProductDto.tags === "string"
+                    ? JSON.parse(updateProductDto.tags)
+                    : updateProductDto.tags || [];
 
-      return this.productsService.updateProduct(productId, productPayload);
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException("Invalid JSON in product payload");
+            const parsedAttributes =
+                typeof updateProductDto.attributes === "string"
+                    ? JSON.parse(updateProductDto.attributes)
+                    : updateProductDto.attributes;
+
+            const parsedVariants =
+                typeof updateProductDto.variants === "string"
+                    ? JSON.parse(updateProductDto.variants)
+                    : updateProductDto.variants;
+
+            const parsedVariantsToDelete =
+                typeof updateProductDto.variantsToDelete === "string"
+                    ? JSON.parse(updateProductDto.variantsToDelete)
+                    : updateProductDto.variantsToDelete || [];
+
+            // ✅ Attach images to variants by index
+            const variantsWithImages =
+                parsedVariants?.map((variant, index) => {
+                    if (files.variantImages?.[index]) {
+                        variant.imageFile = files.variantImages[index];
+                    }
+                    return variant;
+                }) || [];
+
+            // ✅ Final product payload
+            const productPayload = {
+                ...updateProductDto,
+                storeId,
+                tags: parsedTags,
+                attributes: parsedAttributes,
+                variants: variantsWithImages,
+                variantsToDelete: parsedVariantsToDelete,
+                thumbnail
+            };
+
+            return this.productsService.updateProduct(
+                productId,
+                productPayload
+            );
+        } catch (error) {
+            console.error(error);
+            throw new BadRequestException("Invalid JSON in product payload");
+        }
     }
-  }
-    
 
     /** Update a specific product variant */
     @Patch(":productId/variants/:variantId")
