@@ -398,9 +398,8 @@ export class ProductsService {
   /** Update product */
   async updateProduct(productId: string, updateProductDto: UpdateProductDto) {
     try {
-      let updatedVariants: any[] = [];
       this.validateUUID(productId, 'product ID');
-      const product = await this.getProductById(productId);
+      const product = (await this.findProduct(productId)).product;
 
       const updatedSlug = updateProductDto.name
         ? generateSlug(updateProductDto.name)
@@ -495,8 +494,10 @@ export class ProductsService {
           }
         }
       }
+      // Return the updated product
+      const finalUpdatedProduct = await this.findProduct(productId);
 
-      return updatedProduct[0];
+      return finalUpdatedProduct;
     } catch (error) {
       if (
         error instanceof BadRequestException ||
