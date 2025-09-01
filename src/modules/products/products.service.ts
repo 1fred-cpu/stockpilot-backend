@@ -557,9 +557,21 @@ export class ProductsService {
 
       await this.getProductById(productId);
 
+      // new variant data
+      const newVariantData = {
+        productId,
+        sku: updateVariantDto.sku,
+        color: updateVariantDto.color,
+        size: updateVariantDto.size,
+        price: updateVariantDto.price,
+        weight: updateVariantDto.weight,
+        imageUrl: updateVariantDto.imageFile,
+        dimensions: updateVariantDto.dimensions,
+      };
+
       const { data: updatedVariant, error: updateError } = await this.supabase
         .from('variants')
-        .update({ ...updateVariantDto, updatedAt: new Date() })
+        .update({ ...newVariantData, updatedAt: new Date() })
         .match({ productId, id: variantId })
         .select();
 

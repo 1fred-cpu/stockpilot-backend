@@ -86,13 +86,11 @@ export class ProductsController {
 
   /** Add a new variant to an existing product */
   @Post(':productId/variants')
-  @UseInterceptors(FileInterceptor('variantImage'))
   async addProductVariant(
     @Param('productId') productId: string,
     @Body(ValidationPipe) variant: Variant,
-    @UploadedFile() file: Multer.File,
   ) {
-    return this.productsService.addProductVariant(productId, variant, file);
+    return this.productsService.addProductVariant(productId, variant);
   }
 
   /** Get products for a store */
@@ -130,7 +128,8 @@ export class ProductsController {
   async updateProduct(
     @Param('productId') productId: string,
     @Param('storeId') storeId: string,
-    @Body(ValidationPipe) updateProductDto: UpdateProductDto,
+    @Body(new ValidationPipe({ transform: true }))
+    updateProductDto: UpdateProductDto,
     @UploadedFiles()
     files: {
       thumbnail?: Multer.File[];
