@@ -119,22 +119,60 @@ export class ProductsController {
     return this.productsService.findProduct(productId);
   }
 
-  /** Get all variants for a product */
-  //     @Get(":productId/variants")
-  //     async getProductVariants(
-  //         @Param("storeId") storeId: string,
-  //         @Param("productId") productId: string
-  //     ) {
-  //         return this.productsService.getProductVariants(storeId, productId);
-  //     }
-
   /** Update an existing product */
   @Patch(':productId')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'variantImages', maxCount: 20 },
+    ]),
+  )
   async updateProduct(
     @Param('productId') productId: string,
+    @Param('storeId') storeId: string,
     @Body(ValidationPipe) updateProductDto: UpdateProductDto,
+    @UploadedFiles()
+    files: {
+      thumbnail?: Multer.File[];
+      variantImages?: Multer.File[];
+    },
   ) {
-    return this.productsService.updateProduct(productId, updateProductDto);
+    try {
+      // ✅ Parse JSON fields (tags, attributes, variants[])
+      const parsedTags =
+        typeof updateProductDto.tags === 'string'
+          ? JSON.parse(updateProductDto.tags)
+          : updateProductDto.tags;
+
+      const parsedAttributes =
+        typeof updateProductDto.attributes === 'string'
+          ? JSON.parse(updateProductDto.attributes)
+          : updateProductDto.attributes;
+
+      const parsedVariants =
+        typeof updateProductDto.variants === 'string'
+          ? JSON.parse(updateProductDto.variants)
+          : updateProductDto.variants;
+
+      // ✅ Attach images to variants by index
+      const variantsWithImages = parsedVariants.map((variant, index) => ({
+        ...variant,
+        imageFile: files.variantImages?.[index] ?? null,
+      }));
+
+      // ✅ Final product payload
+      const productPayload = {
+        ...updateProductDto,
+        storeId,
+        tags: parsedTags,
+        attributes: parsedAttributes,
+        variants: variantsWithImages,
+        thumbnail: files.thumbnail?.[0] ?? null,
+      };
+      return this.productsService.updateProduct(productId, productPayload);
+    } catch (error) {
+      throw new Error('Invalid JSON in product payload');
+    }
   }
 
   /** Update a specific product variant */

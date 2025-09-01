@@ -1,5 +1,10 @@
 import { Multer } from 'multer';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 @Injectable()
 export class FileUploadService {
   constructor(
@@ -19,11 +24,29 @@ export class FileUploadService {
       });
 
     if (error) {
-      throw new BadRequestException(`Error uploading file: ${error.message}`);
+      throw new BadRequestException(
+        `Supabase Error uploading file: ${error.message}`,
+      );
     }
 
     // If bucket is PUBLIC:
     const { data: pub } = this.supabase.storage.from(bucket).getPublicUrl(path);
     return pub.publicUrl;
+  }
+
+  async deleteFile(path: string, bucket: string) {
+    try {
+      const { error } = await this.supabase.storage.from(bucket).remove([path]);
+      if (error) {
+        throw new BadRequestException(
+          `Supabase Error deleting file: ${error.message}`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(
+        `Failed to delete file: ${error.message}`,
+      );
+    }
   }
 }

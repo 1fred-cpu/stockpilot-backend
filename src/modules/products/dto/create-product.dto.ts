@@ -8,8 +8,18 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-
+import { Multer } from 'multer';
 export class Variant {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  inventoryId: string;
+
   @IsString()
   @IsNotEmpty()
   color: string;
@@ -41,6 +51,9 @@ export class Variant {
   @IsString()
   @IsNotEmpty()
   sku: string;
+
+  @IsOptional()
+  imageFile: Multer.File;
 }
 
 export class CreateProductDto {
