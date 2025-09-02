@@ -452,7 +452,7 @@ export class ProductsService {
 
       if (deleteError) {
         throw new BadRequestException(
-          `Error deleting product: ${deleteError.message}`,
+          `Supabase Error deleting product: ${deleteError.message}`,
         );
       }
       if (!deletedProduct) {

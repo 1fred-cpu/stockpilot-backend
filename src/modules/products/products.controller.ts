@@ -12,6 +12,8 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   FileFieldsInterceptor,
@@ -28,6 +30,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   /** Create a new product */
+  @HttpCode(HttpStatus.CREATED)
   @Post()
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -86,6 +89,7 @@ export class ProductsController {
   }
 
   /** Add a new variant to an existing product */
+
   @Post(':productId/variants')
   async addProductVariant(
     @Param('productId') productId: string,
@@ -95,6 +99,7 @@ export class ProductsController {
   }
 
   /** Get products for a store */
+  @HttpCode(HttpStatus.FOUND)
   @Get()
   async getProducts(
     @Param('storeId') storeId: string,
@@ -113,12 +118,14 @@ export class ProductsController {
   }
 
   /** Find a specific product */
+  @HttpCode(HttpStatus.FOUND)
   @Get(':productId')
   async findProduct(@Param('productId') productId: string) {
     return this.productsService.findProduct(productId);
   }
 
   /** Update an existing product */
+  @HttpCode(HttpStatus.OK)
   @Patch(':productId')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -189,6 +196,7 @@ export class ProductsController {
   }
 
   /** Update a specific product variant */
+  @HttpCode(HttpStatus.OK)
   @Patch(':productId/variants/:variantId')
   async updateProductVariant(
     @Param('productId') productId: string,
@@ -203,12 +211,14 @@ export class ProductsController {
   }
 
   /** Delete a product */
+  @HttpCode(HttpStatus.OK)
   @Delete(':productId')
   async deleteProduct(@Param('productId') productId: string) {
     return this.productsService.deleteProduct(productId);
   }
 
   /** Delete a product variant */
+  @HttpCode(HttpStatus.OK)
   @Delete(':productId/variants/:variantId')
   async deleteProductVariant(
     @Param('productId') productId: string,
