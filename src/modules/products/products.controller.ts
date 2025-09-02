@@ -99,7 +99,7 @@ export class ProductsController {
   }
 
   /** Get products for a store */
-  @HttpCode(HttpStatus.FOUND)
+  @HttpCode(HttpStatus.OK)
   @Get()
   async getProducts(
     @Param('storeId') storeId: string,
@@ -118,7 +118,7 @@ export class ProductsController {
   }
 
   /** Find a specific product */
-  @HttpCode(HttpStatus.FOUND)
+  @HttpCode(HttpStatus.OK)
   @Get(':productId')
   async findProduct(@Param('productId') productId: string) {
     return this.productsService.findProduct(productId);

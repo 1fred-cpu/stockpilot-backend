@@ -265,7 +265,7 @@ export class StoresService {
       }
 
       if (!data || data.length === 0) {
-        throw new NotFoundException('No categories found');
+        return [];
       }
 
       return data.map((category) => category.name);
