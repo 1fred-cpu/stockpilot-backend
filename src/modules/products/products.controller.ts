@@ -171,13 +171,13 @@ export class ProductsController {
             // ✅ Attach images to variants by index
             const variantsWithImages =
                 parsedVariants?.map(variant => {
-                  if(!files.variantImages) return null
-
-                    files?.variantImages.forEach(variantFile => {
-                        if (variant.sku === variantFile?.sku) {
-                            variant.imageFile = variantFile;
-                        }
-                    });
+                    if (files?.variantImages) {
+                        files.variantImages.forEach(variantFile => {
+                            if (variant.sku === variantFile?.sku) {
+                                variant.imageFile = variantFile;
+                            }
+                        });
+                    }
 
                     return variant;
                 }) || [];
