@@ -38,7 +38,7 @@ export class ProductsService {
   private async getProductById(productId: string) {
     const { data: product, error } = await this.supabase
       .from('products')
-      .select('*, stores(storeName), categories(name)')
+      .select('*, stores(storeName, id), categories(name)')
       .eq('id', productId)
       .maybeSingle();
 
@@ -73,6 +73,7 @@ export class ProductsService {
 
       // Generate slug for product
       const slug = generateSlug(name);
+
       // Check duplicate product name in store
       const { data: existingProduct, error: existsError } = await this.supabase
         .from('products')
@@ -94,11 +95,10 @@ export class ProductsService {
       const path = `stores/${storeName}/${new Date().getTime()}_${
         thumbnail.originalname
       }`;
-      const bucket = 'products';
       const thumbnailUrl = await this.fileUploadService.uploadFile(
         thumbnail,
         path,
-        bucket,
+        'products',
       );
 
       if (!thumbnailUrl) {
@@ -152,89 +152,22 @@ export class ProductsService {
 
       if (productError) {
         throw new BadRequestException(
-          `Error creating product: ${productError.message}`,
+          `Suapabse Error creating product: ${productError.message}`,
         );
       }
 
       const product = productData[0];
+      const variantsWithInventory: any[] = [];
 
-      // Create variants
-      const variantsToInsert = variants.map(async (variant) => {
-        // Define a path to upload file
-        const path = `stores/${storeName}/${new Date().getTime()}_${
-          variant.imageFile.originalname
-        }`;
-        // Bucket name to store files
-        const bucket = 'products';
-        // Upload file and return url
-        const imageUrl = await this.fileUploadService.uploadFile(
-          variant.imageFile,
-          path,
-          bucket,
-        );
-        // Throw an error if image url is empty
-        if (!imageUrl) {
-          throw new BadRequestException('Variant image file required');
-        }
-
-        return {
-          productId: product.id,
-          storeId: product.storeId,
-          sku: variant.sku,
-          color: variant.color,
-          size: variant.size,
-          price: variant.price,
-          weight: variant.weight,
-          imageUrl,
-          dimensions: variant.dimensions,
-        };
-      });
-
-      const { data: variantsData, error: variantsError } = await this.supabase
-        .from('variants')
-        .insert(await Promise.all(variantsToInsert))
-        .select();
-
-      if (variantsError) {
-        throw new BadRequestException(
-          `Error creating variants: ${variantsError.message}`,
-        );
-      }
-
-      // Create inventory
-      const inventoryToInsert = variantsData.map((variant, index) => ({
-        productId: product.id,
-        storeId,
-        variantId: variant.id,
-        stock: variants[index].stock,
-        reserved: variants[index].reserved,
-        totalStock: variants[index].stock,
-        lowStockThreshold: variants[index].lowStockThreshold,
-      }));
-
-      const { data: inventoryData, error: inventoryError } = await this.supabase
-        .from('inventories')
-        .insert(inventoryToInsert)
-        .select();
-
-      if (inventoryError) {
-        throw new BadRequestException(
-          `Error creating inventory: ${inventoryError.message}`,
-        );
-      }
-
-      // Update inventoryId in variant
-      for (const inv of inventoryData) {
-        await this.supabase
-          .from('variants')
-          .update({ inventoryId: inv.id })
-          .eq('id', inv.variantId);
+      // Create a variant and it inventory
+      for (const variant of variants) {
+        const variantData = await this.addProductVariant(product.id, variant);
+        variantsWithInventory.push(variantData);
       }
 
       return {
         product,
-        variants: variantsData,
-        inventories: inventoryData,
+        variants: variantsWithInventory,
       };
     } catch (error) {
       this.logger.error('Error creating product:', error);
@@ -592,19 +525,38 @@ export class ProductsService {
       throw new NotFoundException('Product variant does not exist');
     }
 
+    // Delete inventory data belong to variant
+    const { data: deletedInventory, error: deleteInvError } =
+      await this.supabase
+        .from('inventories')
+        .delete()
+        .match({ variantId })
+        .select()
+        .maybeSingle();
+
+    // Throw an error if error deleting variant inventory
+    if (deleteInvError) {
+      throw new BadRequestException(
+        `Supabase Error deleting product variant inventory: ${deleteInvError.message}`,
+      );
+    }
+    // Throw an error if variant inventory not found
+    if (!deletedInventory) {
+      throw new NotFoundException('Product variant inventory does not exist');
+    }
+
     // Remove variant image from bucket
     const path = getPathFromUrl(deletedVariant.imageUrl);
     await this.fileUploadService.deleteFile(path, 'products');
 
     // return deletedVariant
-    return deletedVariant;
+    return { deletedVariant, deletedInventory };
   }
 
   /** Add product variant */
   async addProductVariant(productId: string, variant: Variant) {
     try {
-      this.validateUUID(productId, 'product ID');
-      // const product = await this.getProductById(productId);
+      const product = await this.getProductById(productId);
 
       // Check SKU uniqueness
       const { data: existingVariant, error: fetchError } = await this.supabase
@@ -624,15 +576,24 @@ export class ProductsService {
         );
       }
 
+      // upload file to bucket
+      const path = `stores/${product.stores.storeName}/${new Date().getTime()}_${variant.imageFile.originalname}`;
+      const imageUrl = await this.fileUploadService.uploadFile(
+        variant.imageFile,
+        path,
+        'products',
+      );
+
       // Create variant
       const newVariantData = {
         productId,
+        storeId: product.stores.id,
         sku: variant.sku,
         color: variant.color,
         size: variant.size,
         price: variant.price,
         weight: variant.weight,
-        imageUrl: variant.imageFile,
+        imageUrl,
         dimensions: variant.dimensions,
       };
 
@@ -654,6 +615,7 @@ export class ProductsService {
           .insert([
             {
               productId,
+              storeId: product.stores.id,
               variantId: createdVariant[0].id,
               stock: variant.stock,
               reserved: variant.reserved ?? 0,
@@ -683,8 +645,8 @@ export class ProductsService {
       }
 
       return {
-        variant: updatedVariant[0],
-        inventory: variantInventory[0],
+        ...updatedVariant[0],
+        inventories: variantInventory[0],
       };
     } catch (error) {
       if (
@@ -816,7 +778,6 @@ export class ProductsService {
     productId: string,
     dto: UpdateProductDto,
   ) {
-    console.log(dto.variantsToDelete);
     // 1. Delete variants explicitly requested
     if (dto.variantsToDelete && dto.variantsToDelete.length > 0) {
       for (const variantId of dto.variantsToDelete) {
@@ -872,16 +833,18 @@ export class ProductsService {
   }
 
   private async createVariant(product: any, productId: string, variant: any) {
+    // if (variant.imageFile) {
+    //   const path = `stores/${product.stores.storeName}/${Date.now()}_${
+    //     variant.imageFile.originalname
+    //   }`;
+    //   variant.imageFile = await this.fileUploadService.uploadFile(
+    //     variant.imageFile,
+    //     path,
+    //     'products',
+    //   );
+    // }
     if (variant.imageFile) {
-      const path = `stores/${product.stores.storeName}/${Date.now()}_${
-        variant.imageFile.originalname
-      }`;
-      variant.imageFile = await this.fileUploadService.uploadFile(
-        variant.imageFile,
-        path,
-        'products',
-      );
+      await this.addProductVariant(productId, variant);
     }
-    await this.addProductVariant(productId, variant);
   }
 }

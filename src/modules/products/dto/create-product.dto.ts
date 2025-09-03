@@ -1,59 +1,60 @@
 import {
-    IsString,
-    IsNotEmpty,
-    IsArray,
-    IsOptional,
-    IsObject,
-    ValidateNested,
-    IsNumber
-} from "class-validator";
-import { Type, Transform } from "class-transformer";
-import { Multer } from "multer";
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsOptional,
+  IsObject,
+  ValidateNested,
+  IsNumber,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { Multer } from 'multer';
 
 export class Variant {
-    @IsOptional()
-    @IsString()
-    id?: string;
+  @IsOptional()
+  @IsString()
+  id?: string;
 
-    @IsOptional()
-    @IsString()
-    inventoryId?: string;
+  @IsOptional()
+  @IsString()
+  inventoryId?: string;
 
-    @IsString()
-    @IsNotEmpty()
-    color: string;
+  @IsString()
+  @IsNotEmpty()
+  color: string;
 
-    @IsString()
-    @IsNotEmpty()
-    size: string;
+  @IsString()
+  @IsNotEmpty()
+  size: string;
 
-    @IsString()
-    @IsNotEmpty()
-    weight: string;
+  @IsString()
+  @IsNotEmpty()
+  weight: string;
 
-    @IsString()
-    @IsNotEmpty()
-    dimensions: string;
+  @IsString()
+  @IsNotEmpty()
+  dimensions: string;
 
-    @IsNumber()
-    stock: number;
+  @IsNumber()
+  stock: number;
 
-    @IsNumber()
-    price: number;
+  @IsNumber()
+  price: number;
 
-    @IsNumber()
-    lowStockThreshold: number;
+  @IsNumber()
+  lowStockThreshold: number;
 
-    @IsNumber()
-    reserved: number;
+  @IsNumber()
+  reserved: number;
 
-    @IsString()
-    @IsNotEmpty()
-    sku: string;
+  @IsString()
+  @IsNotEmpty()
+  sku: string;
 
-    @IsOptional()
-    imageFile?: Multer.File;
-}export class CreateProductDto {
+  @IsOptional()
+  imageFile?: Multer.File;
+}
+export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -116,4 +117,3 @@ export class Variant {
   @Type(() => Variant)
   variants: Variant[];
 }
-

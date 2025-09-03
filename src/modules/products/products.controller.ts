@@ -170,9 +170,12 @@ export class ProductsController {
 
       // ✅ Attach images to variants by index
       const variantsWithImages =
-        parsedVariants?.map((variant, index) => {
-          if (files.variantImages?.[index]) {
-            variant.imageFile = files.variantImages[index];
+        parsedVariants?.map((variant) => {
+          if (
+            typeof variant.imageFileIndex === 'number' &&
+            files.variantImages?.[variant.imageFileIndex]
+          ) {
+            variant.imageFile = files.variantImages[variant.imageFileIndex];
           }
           return variant;
         }) || [];
@@ -187,6 +190,8 @@ export class ProductsController {
         variantsToDelete: parsedVariantsToDelete,
         thumbnail,
       };
+
+      console.log(productPayload);
 
       return this.productsService.updateProduct(productId, productPayload);
     } catch (error) {
