@@ -198,6 +198,9 @@ export class ProductsService {
           `Error retrieving product variants: ${variantsError.message}`,
         );
       }
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
       if (!variants.length) {
         throw new NotFoundException('No variants found for this product');
       }
@@ -412,7 +415,7 @@ export class ProductsService {
 
       for (const variant of variants) {
         const variantImagePath = getPathFromUrl(variant.imageUrl);
-        await this.fileUploadService.deleteFile(path, 'products');
+        await this.fileUploadService.deleteFile(variantImagePath, 'products');
       }
 
       return { message: 'Product deleted successfully' };
@@ -709,8 +712,7 @@ export class ProductsService {
       }
       if (variants.length === 0) {
         throw new NotFoundException(
-          `No variants found for this product with this ${productId}
-                    ID`,
+          `No variants found for this product with this product ID ${productId}`,
         );
       }
 
