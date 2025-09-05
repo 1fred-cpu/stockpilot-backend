@@ -20,13 +20,16 @@ import { UpdateStoreDto } from './dto/update-store.dto';
 import { Multer } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Store } from './entities/store.entity';
+import { Categories } from 'src/entities/category.entity';
 
 @Controller('stores')
 export class StoresController {
   constructor(private readonly storesService: StoresService) {}
 
   /**
-   * Create a new store
+   * Create a store
+   * @param createStoreDto
+   * @returns Store
    */
   @HttpCode(HttpStatus.CREATED)
   @Post()
@@ -34,6 +37,72 @@ export class StoresController {
     @Body(ValidationPipe) createStoreDto: CreateStoreDto,
   ): Promise<Store | undefined> {
     return this.storesService.createStore(createStoreDto);
+  }
+
+  /**
+   *  Find a store
+   * @param storeId
+   * @returns a store
+   */
+  @HttpCode(HttpStatus.OK)
+  @Get(':storeId')
+  async findStore(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+  ): Promise<Store | undefined> {
+    return this.storesService.findStore(storeId);
+  }
+
+  /**
+   *  Finds all stores
+   * @param businessId
+   * @returns all stores
+   */
+  @HttpCode(HttpStatus.OK)
+  @Get(':businessId/all')
+  async findAllStores(
+    @Param('businessId', ParseUUIDPipe) businessId: string,
+  ): Promise<Store[] | undefined> {
+    return this.storesService.findAllStores(businessId);
+  }
+
+  /**
+   *  Finds all categories that belongs to store
+   * @param businessId
+   * @returns Finds all categories that belongs to store
+   */
+  @HttpCode(HttpStatus.OK)
+  @Get(':storeId/categories')
+  async findStoreCategories(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+  ): Promise<Categories | undefined> {
+    return this.storesService.getStoreProductsCategories(storeId);
+  }
+
+  /**
+   *  Find store and update
+   * @param storeId
+   * @returns updated store
+   */
+  @HttpCode(HttpStatus.OK)
+  @Patch(':storeId')
+  async updateStore(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Body(ValidationPipe) dto: UpdateStoreDto,
+  ): Promise<Store | undefined> {
+    return this.storesService.updateStore(storeId, dto);
+  }
+
+  /**
+   *  Find store and delete
+   * @param storeId
+   * @returns deleted store
+   */
+  @HttpCode(HttpStatus.OK)
+  @Delete(':storeId')
+  async deleteStore(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+  ): Promise<Store | undefined> {
+    return this.storesService.deleteStore(storeId);
   }
 
   // /**

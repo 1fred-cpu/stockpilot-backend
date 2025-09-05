@@ -6,7 +6,7 @@ export const kafkaConfig: ClientsModuleOptions = [
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'stockpilot',
+        clientId: 'stockpilot-client',
         brokers: ['localhost:9092'], // change to your Kafka brokers
       },
       consumer: {
@@ -19,7 +19,7 @@ export const kafkaConfig: ClientsModuleOptions = [
     transport: Transport.KAFKA,
     options: {
       client: {
-        clientId: 'stockpilot',
+        clientId: 'stockpilot-client',
         brokers: ['localhost:9092'], // change to your Kafka brokers
       },
       consumer: {

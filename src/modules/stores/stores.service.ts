@@ -14,6 +14,8 @@ import { CreateStoreDto } from './dto/create-store.dto';
 import { Store } from './entities/store.entity';
 import { KafkaHelper } from '../../helpers/kafka.heper';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { UpdateStoreDto } from './dto/update-store.dto';
+import { Categories } from 'src/entities/category.entity';
 // @Injectable()
 // export class StoresService {
 //   private readonly logger = new Logger(StoresService.name);
@@ -191,35 +193,6 @@ import { SupabaseClient } from '@supabase/supabase-js';
 //     }
 //   }
 
-//   async getStoreProductsCategories(storeId: string) {
-//     try {
-//       if (!isValidUUID(storeId)) {
-//         throw new BadRequestException('Invalid store ID format');
-//       }
-
-//       const { data, error } = await this.supabase
-//         .from('categories')
-//         .select('name')
-//         .eq('storeId', storeId);
-
-//       if (error) {
-//         this.logger.error(
-//           `Error fetching product categories: ${error.message}`,
-//         );
-//         throw new InternalServerErrorException(
-//           'Error fetching product categories',
-//         );
-//       }
-
-//       if (!data || data.length === 0) {
-//         return [];
-//       }
-
-//       return data.map((category) => category.name);
-//     } catch (error) {
-//       this.handleServiceError(error, 'getStoreProductsCategories');
-//     }
-//   }
 //   /** -------------------- HELPER METHODS -------------------- **/
 //   private validateUUID(id: string, label: string) {
 //     if (!isValidUUID(id)) {
@@ -268,9 +241,11 @@ export class StoresService {
   async createStore(dto: CreateStoreDto): Promise<Store | undefined> {
     try {
       // Check if store with same name and business_id exists for the business
-      if (await this.doStoreExists(dto.business_id, dto.name)) {
+      if (
+        await this.doStoreExists(dto.business_id, dto.store_name, dto.location)
+      ) {
         throw new ConflictException(
-          'Store with this business ID and name already exists',
+          'Store with this business ID, name and location already exists',
         );
       }
 
@@ -278,9 +253,10 @@ export class StoresService {
       const store = {
         id: uuidv4(),
         business_id: dto.business_id,
-        name: dto.name,
+        name: dto.store_name,
         timezone: dto.timezone,
         currency: dto.currency,
+        location: dto.location,
         created_at: new Date().toISOString(),
       };
 
@@ -293,29 +269,136 @@ export class StoresService {
         throw new BadRequestException(createError.message);
       }
 
-      // Emit Kafka event
-      await this.kafkaHelper.emitEvent(
-        'store.events',
-        store.business_id,
-        'StoreCreated',
-        store,
-      );
+      // // Emit Kafka event
+      // await this.kafkaHelper.emitEvent(
+      //   'store.events',
+      //   store.business_id,
+      //   'StoreCreated',
+      //   store,
+      // );
 
       return store;
     } catch (error) {
-      this.errorHandler.handleServiceError(error, 'create method');
+      this.errorHandler.handleServiceError(error, 'createStore');
+    }
+  }
+
+  /**  FIND A STORE METHOD */
+  async findStore(storeId: string): Promise<Store | undefined> {
+    try {
+      return this.getStore(storeId);
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'findStore');
+    }
+  }
+
+  /** FIND ALL STORES FOR A BUSINESS */
+  async findAllStores(businessId: string): Promise<Store[] | undefined> {
+    try {
+      const { data: stores, error: fetchError } = await this.supabase
+        .from('stores')
+        .select('*')
+        .eq('business_id', businessId);
+
+      if (fetchError) {
+        throw new BadRequestException(fetchError.message);
+      }
+
+      if (stores.length === 0) {
+        return [];
+      }
+
+      return stores;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'findAllStores');
+    }
+  }
+
+  /** FIND STORE AND UPDATE */
+  async updateStore(
+    storeId: string,
+    dto: UpdateStoreDto,
+  ): Promise<Store | undefined> {
+    try {
+      // returns a store , throws an error when not found
+      await this.getStore(storeId);
+
+      // Update store with the new data
+      const { data: updatedStore, error: updateError } = await this.supabase
+        .from('stores')
+        .update({ ...dto, updated_at: new Date().toISOString() })
+        .eq('id', storeId)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        throw new BadRequestException(updateError.message);
+      }
+
+      return updatedStore;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'updateStore');
+    }
+  }
+
+  /** DELETE STORE METHOD  */
+  async deleteStore(storeId: string): Promise<Store | undefined> {
+    try {
+      // returns a store or throws an error when not found
+      await this.getStore(storeId);
+
+      // Delete store
+      const { data: deletedStore, error: deleteError } = await this.supabase
+        .from('stores')
+        .delete()
+        .eq('id', storeId)
+        .select()
+        .maybeSingle();
+
+      if (deleteError) {
+        throw new BadRequestException(deleteError.message);
+      }
+
+      return deletedStore;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'deleteStore');
+    }
+  }
+
+  async getStoreProductsCategories(
+    storeId: string,
+  ): Promise<Categories | undefined> {
+    try {
+      const { data, error } = await this.supabase
+        .from('categories')
+        .select('name')
+        .eq('storeId', storeId);
+
+      if (error) {
+        throw new BadRequestException(error.message);
+      }
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      return data.map((category) => category.name);
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getStoreProductsCategories');
     }
   }
   /** Helpers method */
 
+  // Check store exists
   private async doStoreExists(
     business_id: string,
     name: string,
+    location,
   ): Promise<boolean> {
     const { data: existsStore, error: existsError } = await this.supabase
       .from('stores')
       .select('id')
-      .match({ business_id, name })
+      .match({ business_id, name, location })
       .maybeSingle();
 
     if (existsError) {
@@ -323,5 +406,22 @@ export class StoresService {
     }
 
     return existsStore !== null;
+  }
+
+  // Get a store
+  private async getStore(storeId: string): Promise<Store | undefined> {
+    const { data: store, error: fetchError } = await this.supabase
+      .from('stores')
+      .select('*')
+      .eq('id', storeId)
+      .maybeSingle();
+    if (fetchError) {
+      throw new BadRequestException(fetchError.message);
+    }
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+    return store;
   }
 }

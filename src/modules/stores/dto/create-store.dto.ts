@@ -45,11 +45,14 @@ export class CreateStoreDto {
   business_id: string;
 
   @IsString()
-  name: string;
+  store_name: string;
 
   @IsString()
   timezone: string;
 
   @IsString()
   currency: string;
+
+  @IsString()
+  location: string;
 }
