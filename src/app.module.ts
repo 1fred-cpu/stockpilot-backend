@@ -17,6 +17,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
 import { InventoryConsumerModule } from './consumers/inventory/inventory.module';
+import { BusinessModule } from './modules/business/business.module';
 @Module({
   imports: [
     // Load environment variables from .env file
@@ -37,7 +38,7 @@ import { InventoryConsumerModule } from './consumers/inventory/inventory.module'
     AuthMiddlewareModule,
 
     //Modules
-    SupabaseModule,
+    BusinessModule,
     StoresModule,
     ProductsModule,
     InventoryModule,
