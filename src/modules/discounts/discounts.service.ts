@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
-import { isValidUUID } from '../../../utils/id-validator';
+import { isValidUUID } from '../../utils/id-validator';
 @Injectable()
 export class DiscountsService {
   private logger = new Logger(DiscountsService.name);

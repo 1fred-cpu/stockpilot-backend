@@ -9,13 +9,13 @@ import {
 } from '@nestjs/common';
 import { CreateProductDto, Variant } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { isValidUUID } from '../../../utils/id-validator';
-import { generateSlug } from 'utils/slug-generator';
-import { Filter } from 'types/filter';
+import { isValidUUID } from '../../utils/id-validator';
+import { generateSlug } from 'src/utils/slug-generator';
+import { Filter } from 'src/types/filter';
 import { Multer } from 'multer';
-import { FileUploadService } from '../../../utils/upload-file';
+import { FileUploadService } from '../../utils/upload-file';
 import { DiscountsService } from '../discounts/discounts.service';
-import { getPathFromUrl } from 'utils/get-path';
+import { getPathFromUrl } from 'src/utils/get-path';
 
 @Injectable()
 export class ProductsService {

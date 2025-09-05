@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import Stripe from 'stripe';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from '../../../utils/mail/mail.service';
+import { MailService } from '../../utils/mail/mail.service';
 @Injectable()
 export class WebhooksService {
   private stripe;

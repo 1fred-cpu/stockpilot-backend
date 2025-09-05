@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { StoresController } from './stores.controller';
-import { SupabaseModule } from 'lib/supabase.module';
-import { FileUploadService } from 'utils/upload-file';
+import { SupabaseModule } from 'src/lib/supabase.module';
+import { FileUploadService } from 'src/utils/upload-file';
+import { HandleErrorService } from 'src/helpers/handle-error.helper';
+import { KafkaModule } from 'src/config/kafka.module';
+
 @Module({
+  imports: [SupabaseModule, KafkaModule],
   controllers: [StoresController],
-  providers: [StoresService, FileUploadService],
-  imports: [SupabaseModule],
+  providers: [StoresService, FileUploadService, HandleErrorService],
 })
 export class StoresModule {}

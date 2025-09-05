@@ -6,7 +6,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { isValidUUID } from '../../../utils/id-validator';
+import { isValidUUID } from '../../utils/id-validator';
 @Injectable()
 export class AnalyticsService {
   private logger = new Logger(AnalyticsService.name);

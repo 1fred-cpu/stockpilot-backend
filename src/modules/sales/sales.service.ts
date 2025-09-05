@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
-import { isValidUUID } from '../../../utils/id-validator';
+import { isValidUUID } from '../../utils/id-validator';
 import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()

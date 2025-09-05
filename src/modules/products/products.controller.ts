@@ -22,7 +22,7 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto, Variant } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Filter } from 'types/filter';
+import { Filter } from 'src/types/filter';
 import { Multer } from 'multer';
 
 @Controller('stores/:storeId/products')
