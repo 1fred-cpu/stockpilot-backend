@@ -33,6 +33,7 @@
     "class-validator": "^0.14.2",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "kafka": "^0.2.3",
     "kafkajs": "^2.2.4",
     "nodemailer": "^7.0.5",
     "reflect-metadata": "^0.2.2",

@@ -8,14 +8,16 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Stripe from "stripe";
-
+import { HandleErrorService } from "../../helpers/handle-error.helper";
+import { SupabaseClient } from "@supabase/supabase-js";
 @Injectable()
 export class BillingService {
     private stripe;
     private logger = new Logger(BillingService.name);
     constructor(
         private readonly configService: ConfigService,
-        @Inject("SUPABASE_CLIENT") private readonly supabase: any
+        @Inject("SUPABASE_CLIENT") private readonly supabase: SupabaseClient,
+        private readonly errorHandler: HandleErrorService
     ) {
         this.stripe = new Stripe(
             this.configService.get<string>("STRIPE_SECRET")!,
@@ -26,7 +28,7 @@ export class BillingService {
     // POST /api/billing/subscribe { priceId }  // Stripe Price ID
     async subscribeStore(
         storeId: string,
-        plan: "Starter" | "Growth" | "Enterprise"
+        plan: "Starter" | "Growth" | "Enterprise" = "Starter"
     ) {
         try {
             const priceId = await this.getPriceId(plan);
@@ -134,10 +136,9 @@ export class BillingService {
     }
 
     // POST /api/billing/cancel { cancelAtPeriodEnd?: boolean }
-    async cancelSubscribe( dto: any) {
+    async cancelSubscribe(dto: any) {
         try {
-          
-          const {storeId} = dto
+            const { storeId } = dto;
             // 1. Fetch store
             const { data: store, error: fetchError } = await this.supabase
                 .from("stores")
@@ -301,7 +302,7 @@ export class BillingService {
                 ${error.message}`);
                 }
 
-                priceId = data.priceId;
+                priceId = data?.priceId;
                 break;
             }
             case "Growth": {
@@ -315,7 +316,7 @@ export class BillingService {
                 ${error.message}`);
                 }
 
-                priceId = data.priceId;
+                priceId = data?.priceId;
                 break;
             }
             case "Enterprise": {
@@ -329,12 +330,99 @@ export class BillingService {
                 ${error.message}`);
                 }
 
-                priceId = data.priceId;
+                priceId = data?.priceId;
                 break;
             }
             default:
                 throw new BadRequestException("Invalid plan");
         }
         return priceId;
+    }
+
+    /**
+     * Create a Stripe customer when a new business is created.
+     */
+    async createCustomer(businessId: string, ownerUserId: string) {
+        try {
+            const { data: business, error: fetchError } = await this.supabase
+                .from("businesses")
+                .select("*")
+                .eq("id", businessId)
+                .maybeSingle();
+
+            if (fetchError) throw new BadRequestException(fetchError.message);
+            if (!business) throw new NotFoundException("Business not found");
+
+            // Skip if already has Stripe customer
+            if (business.stripe_customer_id) {
+                this.logger.log(
+                    `Stripe customer already exists for business ${businessId}`
+                );
+                return;
+            }
+
+            // Create Stripe customer
+            const customer = await this.stripe.customers.create({
+                email: business.email,
+                metadata: {
+                    businessId,
+                    ownerUserId,
+                    
+                }
+            });
+
+            // Update Supabase
+            const { error: updateError } = await this.supabase
+                .from("businesses")
+                .update({ stripe_customer_id: customer.id })
+                .eq("id", businessId);
+
+            if (updateError) throw new BadRequestException(updateError.message);
+
+            this.logger.log(
+                `Stripe customer created for business ${businessId}`
+            );
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "createCustomer");
+        }
+    }
+    async subscribeBusiness(
+        businessId: string,
+        plan: "Starter" | "Growth" | "Enterprise" = "Starter"
+    ) {
+        try {
+            const priceId = await this.getPriceId(plan);
+
+            const { data: business, error: fetchError } = await this.supabase
+                .from("businesses")
+                .select("*")
+                .eq("id", businessId)
+                .maybeSingle();
+
+            if (fetchError) throw new BadRequestException(fetchError.message);
+            if (!business) throw new NotFoundException("Business not found");
+
+            const customerId = business.stripe_customer_id;
+            if (!customerId)
+                throw new BadRequestException("Stripe customer missing");
+
+            // Create checkout session
+            const session = await this.stripe.checkout.sessions.create({
+                mode: "subscription",
+                customer: customerId,
+                line_items: [{ price: priceId, quantity: 1 }],
+                allow_promotion_codes: true,
+                success_url: `${this.configService.get<string>(
+                    "FRONTEND_URL"
+                )}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${this.configService.get<string>(
+                    "FRONTEND_URL"
+                )}/billing/cancel`
+            });
+
+            return { url: session.url };
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "subscribeBusiness");
+        }
     }
 }
