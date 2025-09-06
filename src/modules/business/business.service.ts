@@ -25,7 +25,7 @@ export class BusinessService {
       // 1. Check if business exists
       if (await this.doBusinessExists(dto.business_name, dto.owner_user_id)) {
         throw new ConflictException(
-          'Business with this name and owner already exists',
+          'A business with this name already exists under your account. Please choose a different name.',
         );
       }
       const {
@@ -50,6 +50,12 @@ export class BusinessService {
         created_at: now,
       };
 
+      const { error: bizError } = await this.supabase
+        .from('businesses')
+        .insert([business]);
+
+      if (bizError) throw new BadRequestException(bizError.message);
+
       // 3. Create owner user
       const user = await this.createOwner(
         businessId,
@@ -57,12 +63,6 @@ export class BusinessService {
         name,
         email,
       );
-
-      const { error: bizError } = await this.supabase
-        .from('businesses')
-        .insert([business]);
-
-      if (bizError) throw new BadRequestException(bizError.message);
 
       // 4.Emit BusinessCreated event
       await this.eventEmitterHelper.emitEvent(
@@ -89,13 +89,20 @@ export class BusinessService {
 
       if (storeError) throw new BadRequestException(storeError.message);
 
-      // Emit StoreCreated event
-      // await this.eventEmitterHelper.emitEvent(
-      //     "store.events",
-      //     businessId,
-      //     "StoreCreated",
-      //     store
-      // );
+      //Emit UserAssignedRole event
+      await this.eventEmitterHelper.emitEvent(
+        'user.events',
+        businessId,
+        'UserAssignedRole',
+        {
+          business_id: businessId,
+          role: 'Admin',
+          email,
+          user_id: user.id,
+          status: 'active',
+          store_id: storeId,
+        },
+      );
 
       return {
         business,
@@ -127,7 +134,12 @@ export class BusinessService {
     }
   }
 
-  private async createOwner(businessId, ownerUserId, name, email) {
+  private async createOwner(
+    businessId,
+    ownerUserId,
+    name,
+    email,
+  ): Promise<any> {
     const { data: existsUser, error: fetchError } = await this.supabase
       .from('users')
       .select('id')
@@ -143,14 +155,18 @@ export class BusinessService {
     }
     const { data: user, error: createError } = await this.supabase
       .from('users')
-      .upsert({
-        id: ownerUserId,
-        business_id: businessId,
-        status: 'active',
-        name,
-        email,
-        created_at: new Date().toISOString(),
-      });
+      .insert([
+        {
+          id: ownerUserId,
+          business_id: businessId,
+          status: 'active',
+          name,
+          email,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .maybeSingle();
     if (createError) {
       throw new BadRequestException(createError.message);
     }

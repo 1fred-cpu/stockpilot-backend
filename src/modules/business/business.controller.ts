@@ -1,5 +1,12 @@
 // business.controller.ts
-import { Controller, Post, Body ,ValidationPipe} from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  ValidationPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { BusinessService } from './business.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 
@@ -7,6 +14,7 @@ import { RegisterBusinessDto } from './dto/register-business.dto';
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
+  @HttpCode(HttpStatus.CREATED)
   @Post('register')
   async registerBusiness(@Body(ValidationPipe) dto: RegisterBusinessDto) {
     return this.businessService.registerBusiness(dto);

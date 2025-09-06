@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 @Injectable()
@@ -15,7 +16,8 @@ export class HandleErrorService {
     if (
       error instanceof BadRequestException ||
       error instanceof NotFoundException ||
-      error instanceof ConflictException
+      error instanceof ConflictException ||
+      error instanceof UnauthorizedException
     ) {
       throw error;
     }
