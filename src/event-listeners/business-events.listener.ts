@@ -2,20 +2,15 @@
 import { Controller, Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { PermissionService } from '../../modules/permission/permission.service';
-import { BillingService } from '../../modules/billing/billing.service';
-import { AnalyticsService } from '../../modules/analytics/analytics.service';
-import { NotificationsService } from '../../modules/notifications/notifications.service';
-
+import { BillingService } from 'src/modules/billing/billing.service';
+import { NotificationsService } from 'src/modules/notifications/notifications.service';
 @Controller()
-export class BusinessListener {
-  private readonly logger = new Logger(BusinessListener.name);
+export class BusinessEventsListener {
+  private readonly logger = new Logger(BusinessEventsListener.name);
 
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly permissionService: PermissionService,
     private readonly billingService: BillingService,
-    private readonly analyticsService: AnalyticsService,
     private readonly notificationsService: NotificationsService,
   ) {}
 

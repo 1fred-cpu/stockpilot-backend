@@ -4,9 +4,22 @@ import { BusinessController } from './business.controller';
 import { SupabaseModule } from 'src/lib/supabase.module';
 import { HandleErrorService } from 'src/helpers/handle-error.helper';
 import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
+import { BusinessEventsListener } from 'src/event-listeners/business-events.listener';
+import { BillingModule } from '../billing/billing.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
-  imports: [SupabaseModule],
+  imports: [
+    SupabaseModule,
+    // These modules are used by the business events listener
+    BillingModule,
+    NotificationsModule,
+  ],
   controllers: [BusinessController],
-  providers: [BusinessService, HandleErrorService, EventEmitterHelper],
+  providers: [
+    BusinessService,
+    HandleErrorService,
+    EventEmitterHelper,
+    BusinessEventsListener,
+  ],
 })
 export class BusinessModule {}

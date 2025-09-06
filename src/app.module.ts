@@ -17,8 +17,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { DiscountsModule } from './modules/discounts/discounts.module';
 import { BusinessModule } from './modules/business/business.module';
-import { InventoryConsumerModule } from './listeners/inventory/inventory.module';
-import { BusinessListenerModule } from './listeners/business/business-listener.module';
+
 import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
   imports: [
@@ -52,10 +51,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     AnalyticsModule,
     BillingModule,
     DiscountsModule,
-
-    /** Event Emitter Consumers */
-    InventoryConsumerModule,
-    BusinessListenerModule,
   ],
   controllers: [AppController],
   providers: [

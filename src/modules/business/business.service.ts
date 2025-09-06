@@ -144,12 +144,11 @@ export class BusinessService {
     const { data: user, error: createError } = await this.supabase
       .from('users')
       .upsert({
-        id: uuidv4(),
+        id: ownerUserId,
         business_id: businessId,
-        owner_user_id: ownerUserId,
+        status: 'active',
         name,
         email,
-        role: 'Admin',
         created_at: new Date().toISOString(),
       });
     if (createError) {

@@ -16,6 +16,10 @@ import { KafkaHelper } from '../../helpers/kafka.heper';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { Categories } from 'src/entities/category.entity';
+import { InviteUserDto } from './dto/invite-user.dto';
+import EventEmitter2 from 'eventemitter2';
+import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
+import { MailService } from 'src/utils/mail/mail.service';
 // @Injectable()
 // export class StoresService {
 //   private readonly logger = new Logger(StoresService.name);
@@ -233,8 +237,8 @@ import { Categories } from 'src/entities/category.entity';
 export class StoresService {
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly kafkaHelper: KafkaHelper,
     private readonly errorHandler: HandleErrorService,
+    private readonly mailService: MailService,
   ) {}
 
   /* CREATE STORE METHOD */
@@ -385,6 +389,75 @@ export class StoresService {
       return data.map((category) => category.name);
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getStoreProductsCategories');
+    }
+  }
+
+  /** INVITES A USER TO JOIN A STORE */
+
+  async inviteUser(
+    storeId: string,
+    businessId: string,
+    dto: InviteUserDto,
+    invitedBy: string,
+  ) {
+    try {
+      // 1. Check if user exists
+      const { data: existingUser, error: userError } = await this.supabase
+        .from('users')
+        .select('*')
+        .eq('email', dto.email)
+        .maybeSingle();
+
+      if (userError) throw new BadRequestException(userError.message);
+
+      let userId: string;
+
+      if (!existingUser) {
+        // 2. Create user in Supabase Auth
+        const { data: authUser, error: authError } =
+          await this.supabase.auth.admin.createUser({
+            email: dto.email,
+            password: dto.password,
+            email_confirm: false,
+            user_metadata: { name: dto.name },
+          });
+
+        if (authError) throw new BadRequestException(authError.message);
+
+        userId = authUser.user.id;
+
+        // Insert into users table
+        const { error: insertError } = await this.supabase
+          .from('users')
+          .insert({
+            id: userId,
+            email: dto.email,
+            name: dto.name,
+            status: 'invited',
+            business_id: businessId,
+          });
+
+        if (insertError) throw new BadRequestException(insertError.message);
+      } else {
+        userId = existingUser.id;
+      }
+
+      // 3. Assign user to store
+      const { error: storeUserError } = await this.supabase
+        .from('store_users')
+        .insert({
+          store_id: storeId,
+          user_id: userId,
+          role: dto.role,
+          status: 'pending',
+          business_id: businessId,
+        });
+
+      if (storeUserError) throw new BadRequestException(storeUserError.message);
+
+      return { message: 'User invited successfully', user_id: userId };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'inviteUser');
     }
   }
   /** Helpers method */
