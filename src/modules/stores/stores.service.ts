@@ -406,7 +406,25 @@ export class StoresService {
     /**  SENDS A INVITE EMAIL */
     async sendInvite(dto: SendInviteDto): Promise<Invite | undefined> {
         try {
-            // 1. Check if invite exists
+            // 1. Check if invited user already exists in store
+            const { data: existingStoreMember, error: existError } =
+                await this.supabase
+                    .from("store_users")
+                    .select("id")
+                    .match({
+                        store_id: dto.store_id,
+                        email: dto.email
+                    })
+                    .maybeSingle();
+            if (existError) {
+                throw new BadRequestException(existError.message);
+            }
+            if (existingStoreMember) {
+                throw new ConflictException(
+                    "Can't send an invite to a user who already exists in a store"
+                );
+            }
+            // 2. Check if invite exists
             const { data: existingInvite, error: fetchError } =
                 await this.supabase
                     .from("invites")
