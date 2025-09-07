@@ -1,5 +1,5 @@
 // dto/invite-user.dto.ts
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsString, IsUUID } from 'class-validator';
 
 export class InviteUserDto {
   @IsEmail()
@@ -13,4 +13,7 @@ export class InviteUserDto {
 
   @IsString()
   password: string;
+
+  @IsUUID()
+  business_id: string;
 }

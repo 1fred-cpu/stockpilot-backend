@@ -432,7 +432,7 @@ export class StoresService {
         throw new BadRequestException(fetchError.message);
       }
       if (existingInvite) {
-        throw new BadRequestException('Invite for this email already exists');
+        throw new ConflictException('Invite for this email already exists');
       }
 
       // 2. Define invite data
@@ -475,14 +475,26 @@ export class StoresService {
 
   /** INVITES A USER TO JOIN A STORE */
 
-  async inviteUser(
-    storeId: string,
-    businessId: string,
-    dto: InviteUserDto,
-    invitedBy: string,
-  ) {
+  async inviteUser(storeId: string, dto: InviteUserDto) {
     try {
-      // 1. Check if user exists
+      // 1. Check if invite already exists for this store + email
+      const { data: existingInvite, error: inviteError } = await this.supabase
+        .from('invites')
+        .select('id, user_id, role, status')
+        .eq('store_id', storeId)
+        .eq('email', dto.email)
+        .maybeSingle();
+
+      if (inviteError) throw new BadRequestException(inviteError.message);
+
+      if (existingInvite) {
+        return {
+          message: 'This user already has an invite or role in this store',
+          store_user: existingInvite,
+        };
+      }
+
+      // 2. Check if user exists in users table
       const { data: existingUser, error: userError } = await this.supabase
         .from('users')
         .select('*')
@@ -494,12 +506,12 @@ export class StoresService {
       let userId: string;
 
       if (!existingUser) {
-        // 2. Create user in Supabase Auth
+        // 3a. Create user in Supabase Auth
         const { data: authUser, error: authError } =
           await this.supabase.auth.admin.createUser({
             email: dto.email,
             password: dto.password,
-            email_confirm: false,
+            email_confirm: true,
             user_metadata: { name: dto.name },
           });
 
@@ -507,7 +519,7 @@ export class StoresService {
 
         userId = authUser.user.id;
 
-        // Insert into users table
+        // 3b. Insert into users table
         const { error: insertError } = await this.supabase
           .from('users')
           .insert({
@@ -515,7 +527,7 @@ export class StoresService {
             email: dto.email,
             name: dto.name,
             status: 'invited',
-            business_id: businessId,
+            business_id: dto.business_id,
           });
 
         if (insertError) throw new BadRequestException(insertError.message);
@@ -523,24 +535,27 @@ export class StoresService {
         userId = existingUser.id;
       }
 
-      // 3. Assign user to store
-      const { error: storeUserError } = await this.supabase
-        .from('store_users')
-        .insert({
+      // 4. Emit UserAssignedRole event
+      this.eventEmitterHelper.emitEvent(
+        'user.events',
+        dto.business_id,
+        'UserAssignedRole',
+        {
+          business_id: dto.business_id,
           store_id: storeId,
           user_id: userId,
+          email: dto.email,
           role: dto.role,
           status: 'pending',
-          business_id: businessId,
-        });
-
-      if (storeUserError) throw new BadRequestException(storeUserError.message);
+        },
+      );
 
       return { message: 'User invited successfully', user_id: userId };
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'inviteUser');
     }
   }
+
   /** Helpers method */
 
   // Check if user exists in a store
