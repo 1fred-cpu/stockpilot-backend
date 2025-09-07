@@ -19,6 +19,8 @@ import { DiscountsModule } from './modules/discounts/discounts.module';
 import { BusinessModule } from './modules/business/business.module';
 
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SchedulesServiceModule } from './schedules/schedule.module';
 @Module({
   imports: [
     // Load environment variables from .env file
@@ -26,16 +28,18 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // Setup a Rate Limitting
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          // profile name
           ttl: 60000, // 60 seconds
-          limit: 100, // global limit
+          limit: 20, // global limit
         },
       ],
     }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
+    SchedulesServiceModule, // This contains all schedule services
 
     //Middlewares
     AuthMiddlewareModule,

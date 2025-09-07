@@ -31,6 +31,9 @@ export class UserEventsListener {
       if (event === 'UserAssignedRole') {
         await this.handleAssignUserRoleEvent(data);
       }
+      if (event === 'UserDeleted') {
+        await this.handleDeleteUserEvent(data);
+      }
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'handleUserEvents');
     }
@@ -177,6 +180,72 @@ export class UserEventsListener {
       }
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'handleAssignUserRoleEvent');
+    }
+  }
+
+  private async handleDeleteUserEvent(data: any) {
+    try {
+      const { user_id, business_id } = data;
+
+      if (!user_id || !business_id) {
+        throw new BadRequestException('user_id and business_id are required');
+      }
+
+      // 1. Delete from store_users
+      const { error: storeUsersError } = await this.supabase
+        .from('store_users')
+        .delete()
+        .eq('user_id', user_id)
+        .eq('business_id', business_id);
+
+      if (storeUsersError) {
+        throw new BadRequestException(
+          `Failed to remove user from store_users: ${storeUsersError.message}`,
+        );
+      }
+
+      // 2. Delete from users table
+      const { data: deletedUser, error: usersError } = await this.supabase
+        .from('users')
+        .delete()
+        .eq('id', user_id)
+        .eq('business_id', business_id)
+        .select('email, name')
+        .maybeSingle();
+
+      if (usersError) {
+        throw new BadRequestException(
+          `Failed to delete user record: ${usersError.message}`,
+        );
+      }
+
+      // 3. Delete from Supabase Auth
+      const { error: authError } =
+        await this.supabase.auth.admin.deleteUser(user_id);
+
+      if (authError) {
+        throw new BadRequestException(
+          `Failed to delete user from Auth: ${authError.message}`,
+        );
+      }
+
+      // 4. Send email notification
+      const html = `
+      <p>Hello ${deletedUser?.name || 'User'},</p>
+      <p>Your account associated with <strong>${deletedUser?.email}</strong> has been removed from our system.</p>
+      <p>If you believe this was a mistake, please contact support.</p>
+      <br/>
+      <p>Best regards,</p>
+      <p>The Team</p>
+    `;
+
+      await this.mailService.sendMail(
+        deletedUser?.email,
+        'Account Removal Notice',
+        html,
+      );
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'handleDeleteUserEvent');
     }
   }
 }
