@@ -25,6 +25,7 @@ import { SendInviteDto } from './dto/send-invite.dto';
 import { Invite } from 'src/entities/invite.entity';
 import { generateExpiry } from 'src/utils/expiry';
 import { User } from '../users/entities/user.entity';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 // @Injectable()
 // export class StoresService {
@@ -773,6 +774,20 @@ export class StoresService {
     userId: string,
   ): Promise<{ message: string } | undefined> {
     try {
+      // Prevent business owner from deleting
+      const { data: owner, error: ownerError } = await this.supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_user_id', userId)
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (ownerError) {
+        throw new UnauthorizedException(ownerError.message);
+      }
+      if (owner) {
+        return { message: "Business owner can't be removed" };
+      }
       // 1. Check if user exists in this business
       const { data: existingUser, error: userError } = await this.supabase
         .from('users')
@@ -806,8 +821,112 @@ export class StoresService {
     }
   }
 
-  /** Helpers method */
+  /**
+   *
+   * @param userId
+   * @param businessId
+   * @param dto
+   * @returns a message
+   */
+  async updateUser(
+    userId: string,
+    businessId: string,
+    dto: UpdateUserDto,
+  ): Promise<{ message: string }> {
+    try {
+      //  Check if user exists
+      if (dto.old_email && dto.new_email) {
+        const { data: existingUser, error: existsError } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('email', dto.old_email)
+          .maybeSingle();
 
+        if (existsError) {
+          throw new BadRequestException(existsError.message);
+        }
+        if (!existingUser) {
+          throw new NotFoundException("Can't find a user with this email");
+        }
+
+        // Prevent duplicate of emails when updating
+        const { data: existingEmail, error: fetchError } = await this.supabase
+          .from('users')
+          .select('id')
+          .eq('email', dto.new_email)
+          .maybeSingle();
+
+        if (fetchError) {
+          throw new BadRequestException(fetchError.message);
+        }
+        if (existingEmail) {
+          throw new ConflictException('The new email provided already in use');
+        }
+      }
+
+      // 1. If email exists → update in Supabase Auth
+      const authPayload: any = {};
+      if (dto.new_email) {
+        authPayload.email = dto.new_email;
+      }
+      if (dto.password) {
+        authPayload.password = dto.password;
+      }
+
+      if (Object.keys(authPayload).length > 0) {
+        const { error: authError } =
+          await this.supabase.auth.admin.updateUserById(userId, authPayload);
+
+        if (authError) {
+          throw new BadRequestException(authError.message);
+        }
+      }
+
+      // 2. Update users table
+      const userUpdateData: any = {};
+      if (dto.new_email) userUpdateData.email = dto.new_email;
+      if (dto.name) userUpdateData.name = dto.name;
+
+      if (Object.keys(userUpdateData).length > 0) {
+        const { error: usersError } = await this.supabase
+          .from('users')
+          .update(userUpdateData)
+          .eq('id', userId)
+          .eq('business_id', businessId);
+
+        if (usersError) throw new BadRequestException(usersError.message);
+      }
+
+      // 3. Update store_users table (role, status, email if you store it here)
+      const storeUserUpdateData: any = {};
+      if (dto.new_email) storeUserUpdateData.email = dto.new_email; // only if stored
+
+      if (Object.keys(storeUserUpdateData).length > 0) {
+        const { error: storeUsersError } = await this.supabase
+          .from('store_users')
+          .update(storeUserUpdateData)
+          .eq('user_id', userId)
+          .eq('business_id', businessId);
+
+        if (storeUsersError) {
+          throw new BadRequestException(storeUsersError.message);
+        }
+      }
+
+      return { message: 'User updated successfully' };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'updateUser');
+      throw error;
+    }
+  }
+
+  /** Helpers method */
+  /**
+   *
+   * @param storeId
+   * @param email
+   * @returns a true if user exists or false if not
+   */
   // Check if user exists in a store
   private async doUserExistsInStore(
     storeId: string,
@@ -830,6 +949,13 @@ export class StoresService {
       return false;
     }
   }
+  /**
+   *
+   * @param business_id
+   * @param name
+   * @param location
+   * @returns a true if store exists or false if not
+   */
   // Check store exists
   private async doStoreExists(
     business_id: string,
@@ -849,6 +975,11 @@ export class StoresService {
     return existsStore !== null;
   }
 
+  /**
+   *
+   * @param storeId
+   * @returns a store data or undefined
+   */
   // Get a store
   private async getStore(storeId: string): Promise<Store | undefined> {
     const { data: store, error: fetchError } = await this.supabase

@@ -25,6 +25,7 @@ import { Store } from './entities/store.entity';
 import { Categories } from 'src/entities/category.entity';
 import { Invite } from 'src/entities/invite.entity';
 import { User } from '../users/entities/user.entity';
+import { UpdateUserDto } from './dto/update-user.dto';
 @Controller('stores')
 export class StoresController {
   constructor(private readonly storesService: StoresService) {}
@@ -166,6 +167,23 @@ export class StoresController {
     @Body(ValidationPipe) dto: UpdateStoreDto,
   ): Promise<Store | undefined> {
     return this.storesService.updateStore(storeId, dto);
+  }
+
+  /**
+   *  Find user and update
+   * @param userId
+   * @param businessId
+   * @param dto
+   * @returns a message
+   */
+  @HttpCode(HttpStatus.OK)
+  @Patch('/businesses/:businessId/users/:userId')
+  async updateUser(
+    @Param('businessId', ParseUUIDPipe) businessId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body(ValidationPipe) dto: UpdateUserDto,
+  ): Promise<{ message: string }> {
+    return this.storesService.updateUser(userId, businessId, dto);
   }
 
   /**

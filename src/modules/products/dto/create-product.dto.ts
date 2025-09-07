@@ -1,119 +1,84 @@
 import {
   IsString,
-  IsNotEmpty,
-  IsArray,
   IsOptional,
-  IsObject,
-  ValidateNested,
   IsNumber,
+  IsArray,
+  ValidateNested,
+  IsUUID,
+  Min,
+  IsDateString,
+  IsBoolean,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
-import { Multer } from 'multer';
+import { Type } from 'class-transformer';
 
-export class Variant {
-  @IsOptional()
+export class CreateVariantDto {
   @IsString()
-  id?: string;
-
-  @IsOptional()
-  @IsString()
-  inventoryId?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  color: string;
-
-  @IsString()
-  @IsNotEmpty()
-  size: string;
-
-  @IsString()
-  @IsNotEmpty()
-  weight: string;
-
-  @IsString()
-  @IsNotEmpty()
-  dimensions: string;
-
-  @IsNumber()
-  stock: number;
-
-  @IsNumber()
-  price: number;
-
-  @IsNumber()
-  lowStockThreshold: number;
-
-  @IsNumber()
-  reserved: number;
-
-  @IsString()
-  @IsNotEmpty()
-  sku: string;
-
-  @IsOptional()
-  imageFile?: Multer.File;
-}
-export class CreateProductDto {
-  @IsString()
-  @IsNotEmpty()
   name: string;
 
   @IsString()
-  @IsNotEmpty()
-  storeName: string;
+  sku: string;
 
-  @IsString()
-  @IsNotEmpty()
-  brand: string;
+  @IsNumber()
+  @Min(0)
+  price: number;
 
-  @IsString()
-  @IsNotEmpty()
-  category: string;
+  @IsNumber()
+  @Min(0)
+  quantity: number;
 
-  @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsNumber()
+  @Min(0)
+  low_stock_threshold: number;
 
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return [];
-      }
-    }
-    return value;
-  })
-  @IsArray()
-  tags: string[];
-
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return {};
-      }
-    }
-    return value;
-  })
   @IsOptional()
-  @IsObject()
-  attributes?: Record<string, any>;
+  @IsString()
+  image_url: string; // base64 string or file path, depending on frontend
 
-  @Transform(({ value }) => {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return [];
-      }
-    }
-    return value;
-  })
+  @IsOptional()
+  @IsString()
+  image_file: string;
+
+  @IsOptional()
+  @IsArray()
+  attributes: Record<string, any>[];
+
+  @IsOptional()
+  @IsDateString()
+  expiry_date?: string; // optional for non-food products
+}
+
+export class CreateProductDto {
+  @IsUUID()
+  business_id: string;
+
+  @IsUUID()
+  store_id: string;
+
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  track_batches?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
+
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => Variant)
-  variants: Variant[];
+  @Type(() => CreateVariantDto)
+  variants: CreateVariantDto[];
 }

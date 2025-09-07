@@ -6,7 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SupabaseModule } from 'src/lib/supabase.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { ProductsModule } from './modules/products/products.module';
+import { ProductsModule } from '../products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { RoleMiddleware } from './middleware/role/role.middleware';

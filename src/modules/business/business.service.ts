@@ -20,6 +20,11 @@ export class BusinessService {
     private readonly errorHandler: HandleErrorService,
   ) {}
 
+  /**
+   *
+   * @param dto
+   * @returns a business object
+   */
   async registerBusiness(dto: RegisterBusinessDto) {
     try {
       // 1. Check if business exists
@@ -113,7 +118,56 @@ export class BusinessService {
     }
   }
 
+  /**
+   *
+   * @param businessId
+   * @returns a message
+   */
+  async deleteBusiness(
+    businessId: string,
+  ): Promise<{ message: string } | undefined> {
+    try {
+      // 1. Check if business exists
+      const { data: existingBusiness, error: existsError } = await this.supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (existsError) {
+        throw new BadRequestException(existsError.message);
+      }
+
+      if (!existingBusiness) {
+        throw new NotFoundException(
+          'Cannot delete a business that is not found',
+        );
+      }
+
+      // 2. Delete business
+      const { error: deleteError } = await this.supabase
+        .from('businesses')
+        .delete()
+        .eq('id', businessId);
+
+      if (deleteError) {
+        throw new BadRequestException(deleteError.message);
+      }
+      return {
+        message: `Business with ID ${businessId} deleted successfully `,
+      };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'deleteBusiness');
+    }
+  }
+
   /** Helpers */
+  /**
+   *
+   * @param name
+   * @param ownerUserId
+   * @returns true if business exists or false if not available
+   */
   private async doBusinessExists(
     name: string,
     ownerUserId: string,
@@ -134,6 +188,14 @@ export class BusinessService {
     }
   }
 
+  /**
+   *
+   * @param businessId
+   * @param ownerUserId
+   * @param name
+   * @param email
+   *
+   */
   private async createOwner(
     businessId,
     ownerUserId,

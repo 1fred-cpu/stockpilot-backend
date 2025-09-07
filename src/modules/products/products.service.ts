@@ -1,852 +1,527 @@
 import {
   Injectable,
   Inject,
-  ConflictException,
-  InternalServerErrorException,
   BadRequestException,
-  Logger,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
-import { CreateProductDto, Variant } from './dto/create-product.dto';
+import { v4 as uuidv4 } from 'uuid';
+import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { isValidUUID } from '../../utils/id-validator';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { generateSlug } from 'src/utils/slug-generator';
-import { Filter } from 'src/types/filter';
-import { Multer } from 'multer';
-import { FileUploadService } from '../../utils/upload-file';
-import { DiscountsService } from '../discounts/discounts.service';
+import { HandleErrorService } from 'src/helpers/handle-error.helper';
+import { Product } from 'src/entities/product.entity';
+import { VariantsService } from './variants.service';
 import { getPathFromUrl } from 'src/utils/get-path';
-
+import { FileUploadService } from 'src/utils/upload-file';
 @Injectable()
 export class ProductsService {
-  private logger = new Logger(ProductsService.name);
-
   constructor(
-    @Inject('SUPABASE_CLIENT') private readonly supabase: any,
-    private readonly fileUploadService: FileUploadService,
-    private readonly discountsService: DiscountsService,
+    @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
+    private readonly errorHandler: HandleErrorService,
+    private readonly variantService: VariantsService,
+    private readonly fileService: FileUploadService,
   ) {}
 
-  /** Helper: Validate UUID */
-  private validateUUID(id: string, fieldName: string) {
-    if (!isValidUUID(id)) {
-      throw new BadRequestException(`Invalid ${fieldName} provided`);
-    }
-  }
-
-  /** Helper: Fetch product by ID */
-  private async getProductById(productId: string) {
-    const { data: product, error } = await this.supabase
-      .from('products')
-      .select('*, stores(storeName, id), categories(name)')
-      .eq('id', productId)
-      .maybeSingle();
-
-    if (error) {
-      throw new BadRequestException(
-        `Error retrieving product: ${error.message}`,
-      );
-    }
-    if (!product) {
-      throw new NotFoundException('Product does not exist');
-    }
-    return product;
-  }
-
-  /** Create product with variants + inventory */
-  async createProduct(createProductDto: any) {
+  /**
+   *
+   * @param businessId
+   * @param dto
+   * @returns a product object
+   */
+  private async createProduct(
+    businessId: string,
+    dto: CreateProductDto,
+  ): Promise<Product | undefined> {
     try {
-      const {
-        storeId,
-        name,
-        brand,
-        category,
-        description,
-        tags,
-        attributes,
-        variants,
-        thumbnail,
-        storeName,
-      } = createProductDto;
+      const id = uuidv4();
+      const payload = {
+        id,
+        business_id: businessId,
+        name: dto.name,
+        description: dto.description ?? null,
+        category: dto.category ?? null,
+        brand: dto.brand ?? null,
+        tags: dto.tags ?? [],
+        slug: generateSlug(dto.name),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      this.validateUUID(storeId, 'store ID');
+      const { error } = await this.supabase.from('products').insert([payload]);
+      if (error) throw new BadRequestException(error.message);
 
-      // Generate slug for product
-      const slug = generateSlug(name);
+      return payload;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'createProduct');
+    }
+  }
 
-      // Check duplicate product name in store
+  /**
+   *
+   * @param name
+   * @param businessId
+   * @returns a boolean value
+   */
+  private async doProductExists(
+    name: string,
+    businessId: string,
+  ): Promise<boolean | undefined> {
+    try {
       const { data: existingProduct, error: existsError } = await this.supabase
         .from('products')
         .select('id')
-        .match({ slug, storeId })
+        .match({
+          business_id: businessId,
+          name,
+        })
         .maybeSingle();
 
       if (existsError) {
-        throw new BadRequestException(
-          `Error checking product: ${existsError.message}`,
-        );
+        throw new BadRequestException(existsError.message);
       }
+
       if (existingProduct) {
-        throw new ConflictException('Product already exists');
+        return true;
+      } else {
+        return false;
       }
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'doProductExists');
+    }
+  }
 
-      // Upload thumbnail file and get url
-
-      const path = `stores/${storeName}/${new Date().getTime()}_${
-        thumbnail.originalname
-      }`;
-      const thumbnailUrl = await this.fileUploadService.uploadFile(
-        thumbnail,
-        path,
-        'products',
-      );
-
-      if (!thumbnailUrl) {
-        throw new BadRequestException('Thumbnail file is required');
-      }
-
-      // find category
-      const { data: categoryData, error: categoryError } = await this.supabase
-        .from('categories')
-        .select('id')
-        .match({ storeId, name: category })
-        .maybeSingle();
-      if (categoryError) {
-        throw new BadRequestException(
-          'Supabase Error fetching category: ' + categoryError.message,
-        );
-      }
-      let categoryId = categoryData?.id || null;
-
-      // Create category if not created
-      if (!categoryData) {
-        const { data, error } = await this.supabase
-          .from('categories')
-          .upsert({ name: category, storeId })
-          .select()
-          .maybeSingle();
-        if (error) {
-          throw new BadRequestException(
-            'Supabase Error creating category: ' + error.message,
-          );
-        }
-        categoryId = data.id;
-      }
-      // Create product
-      const newProductData = {
-        name,
-        brand,
-        categoryId,
-        description,
-        storeId,
-        thumbnail: thumbnailUrl,
-        tags: tags || [],
-        attributes: attributes || {},
-        slug,
-      };
-
-      const { data: productData, error: productError } = await this.supabase
+  /**
+   *
+   * @param businessId
+   * @returns
+   */
+  async findAllByBusiness(businessId: string) {
+    try {
+      const { data, error } = await this.supabase
         .from('products')
-        .insert([newProductData])
-        .select();
+        .select(
+          `
+        id,
+        name,
+        description,
+        category,
+        brand,
+        tags,slug,
+        business_id,
+        store_id,
+        created_at,
+        product_variants (
+          id,
+          name,
+          sku,
+          price,
+          image,
+          store_inventory (
+            id,
+            quantity,
+            low_stock_threshold,
+            status,
+            updated_at,
+            store_inventory_batches (
+              id,
+              batch_number,
+              quantity,
+              expiry_date,
+              received_at,
+              status
+            )
+          )
+        )
+      `,
+        )
+        .eq('business_id', businessId);
 
-      if (productError) {
-        throw new BadRequestException(
-          `Suapabse Error creating product: ${productError.message}`,
-        );
+      if (error) {
+        throw new BadRequestException(error.message);
       }
 
-      const product = productData[0];
-      const variantsWithInventory: any[] = [];
+      return data;
+    } catch (err) {
+      this.errorHandler.handleServiceError(err, 'findAllByBusiness');
+    }
+  }
 
-      // Create a variant and it inventory
-      for (const variant of variants) {
-        const variantData = await this.addProductVariant(product.id, variant);
-        variantsWithInventory.push(variantData);
+  /**
+   *
+   * @param productId
+   * @returns
+   */
+  async findOne(productId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('products')
+        .select(
+          `
+        id,
+        name,
+        description,
+        category,
+        brand,
+        tags,
+        slug,
+        business_id,
+        store_id,
+        created_at,
+        product_variants (
+          id,
+          name,
+          sku,
+          price,
+          image,
+          store_inventory (
+            id,
+            quantity,
+            low_stock_threshold,
+            status,
+            updated_at,
+            store_inventory_batches (
+              id,
+              batch_number,
+              quantity,
+              expiry_date,
+              received_at,
+              status
+            )
+          )
+        )
+      `,
+        )
+        .eq('id', productId)
+        .maybeSingle();
+
+      if (error) throw new BadRequestException(error.message);
+      if (!data) throw new NotFoundException('Product not found');
+
+      return data;
+    } catch (err) {
+      this.errorHandler.handleServiceError(err, 'findOne');
+    }
+  }
+
+  /**
+   *
+   * @param storeId
+   * @returns
+   */
+  async findAllByStore(storeId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('product_variants')
+        .select(
+          `
+        id,
+        name,
+        sku,
+        price,
+        image,
+        store_id,
+        product:products (
+          id,
+          name,
+          description,
+          category,
+          brand,
+          tags,
+          slug,
+          business_id,
+          created_at
+        ),
+        store_inventory (
+          id,
+          quantity,
+          low_stock_threshold,
+          status,
+          updated_at,
+          store_inventory_batches (
+            id,
+            batch_number,
+            quantity,
+            expiry_date,
+            received_at,
+            status
+          )
+        )
+      `,
+        )
+        .eq('store_id', storeId);
+
+      if (error) throw new BadRequestException(error.message);
+
+      return data ?? [];
+    } catch (err) {
+      this.errorHandler.handleServiceError(err, 'findAllByStore');
+    }
+  }
+
+  async update(productId: string, dto: UpdateProductDto) {
+    const updatePayload: any = { ...dto, updated_at: new Date().toISOString() };
+    const { error } = await this.supabase
+      .from('products')
+      .update(updatePayload)
+      .eq('id', productId);
+    if (error) throw new BadRequestException(error.message);
+    return { message: 'Product updated' };
+  }
+
+  async remove(productId: string) {
+    const { error } = await this.supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+    if (error) throw new BadRequestException(error.message);
+    return { message: 'Product removed' };
+  }
+
+  /**
+   *
+   * @param businessId
+   * @param dto
+   * @returns
+   */
+  async createProductWithVariants(businessId: string, dto: CreateProductDto) {
+    try {
+      // Check if product already exists
+      if (await this.doProductExists(dto.name, dto.business_id)) {
+        throw new ConflictException('Product with this name already exists');
+      }
+      // 1. Create product
+      const product = await this.createProduct(dto.business_id, dto);
+
+      const createdVariants: any[] = [];
+
+      // 2. Handle variants
+      for (const variant of dto.variants) {
+        // 2a. insert variant
+        const newVariant = await this.variantService.createVariant(
+          businessId,
+          product?.id as string,
+          variant,
+          variant.image_url,
+        );
+
+        // 2b. Create inventory row
+        await this.supabase.from('store_inventory').insert({
+          store_id: dto.store_id,
+          business_id: businessId,
+          variant_id: newVariant?.id,
+          quantity: variant.quantity,
+          low_stock_threshold: variant.low_stock_threshold,
+        });
+
+        if (dto.track_batches) {
+          // 2d. Create batch row
+          await this.supabase.from('store_inventory_batches').insert({
+            store_id: dto.store_id,
+            business_id: businessId,
+            variant_id: newVariant?.id,
+            batch_number: `BATCH-${Date.now()}`,
+            quantity: variant.quantity,
+            received_at: new Date(),
+            expiry_date: variant.expiry_date ?? null,
+          });
+        }
+
+        createdVariants.push(newVariant);
       }
 
       return {
         product,
-        variants: variantsWithInventory,
+        variants: createdVariants,
+        message: 'Product and variants created successfully',
       };
     } catch (error) {
-      this.logger.error('Error creating product:', error);
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException
-      )
-        throw error;
-      throw new InternalServerErrorException(
-        'Unexpected error creating product',
-      );
+      this.errorHandler.handleServiceError(error, 'createProductWithVariants');
     }
   }
 
-  /** Find product and variants */
-  async findProduct(productId: string) {
-    try {
-      this.validateUUID(productId, 'product ID');
-      const product = await this.getProductById(productId);
-
-      const { data: variants, error: variantsError } = await this.supabase
-        .from('variants')
-        .select('*, inventories(stock,lowStockThreshold,reserved)')
-        .eq('productId', productId);
-
-      if (variantsError) {
-        throw new BadRequestException(
-          `Error retrieving product variants: ${variantsError.message}`,
-        );
-      }
-      if (!product) {
-        throw new NotFoundException('Product not found');
-      }
-      if (!variants.length) {
-        throw new NotFoundException('No variants found for this product');
-      }
-      const productWithVariants = { ...product, variants };
-
-      const appliedDiscountProductWithVariants =
-        (await this.discountsService.applyDiscounts(product.storeId, [
-          productWithVariants,
-        ])) || [];
-
-      return { product: appliedDiscountProductWithVariants[0] };
-    } catch (error) {
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      this.logger.error('Error retrieving product: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error retrieving product',
-      );
-    }
-  }
-
-  /** Get products with optional filter/category */
-  async getProducts(
+  /**
+   * Main method: update product and variants
+   */
+  async updateProductWithVariants(
+    productId: string,
+    updateDto: UpdateProductDto,
     storeId: string,
-    filter?: Filter,
-    limit = 100,
-    sort: 'asc' | 'desc' = 'desc',
-    category?: string,
   ) {
     try {
-      this.validateUUID(storeId, 'store ID');
+      // Step 1: Update product
+      await this.updateProduct(productId, updateDto);
 
-      let query = this.supabase
-        .from('products')
-        .select('*,categories(name)')
-        .eq('storeId', storeId);
-
-      // Apply filter
-      if (filter) {
-        switch (filter) {
-          case 'bestseller':
-            query = query.eq('isBestseller', true);
-            break;
-          case 'featured':
-            query = query.eq('isFeatured', true);
-            break;
-          case 'new':
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            query = query.gte('createdAt', thirtyDaysAgo.toISOString());
-            break;
-          case 'trending':
-            query = query.eq('isTrending', true);
-            break;
-          default:
-            throw new BadRequestException('Invalid filter type');
-        }
-      }
-
-      if (!filter && category) {
-        query = query.eq('category', category);
-      }
-
-      // Sort + limit
-      query = query
-        .order('createdAt', { ascending: sort === 'asc' })
-        .limit(limit);
-
-      const { data: products, error: fetchError } = await query;
-      if (fetchError) {
-        throw new BadRequestException(
-          `Error fetching products: ${fetchError.message}`,
-        );
-      }
-      if (products.length === 0) {
-        return [{ products: [] }];
-      }
-
-      // Attach variants
-      for (const product of products) {
-        const { data: variants, error: variantsError } = await this.supabase
-          .from('variants')
-          .select('*, inventories(stock, lowStockThreshold)')
-          .eq('productId', product.id);
-
-        if (variantsError) {
-          throw new BadRequestException(
-            `Error fetching variants: ${variantsError.message}`,
+      // Step 2: Process variants (update, add, or remove)
+      for (const variant of updateDto.variants as any) {
+        if (variant.id) {
+          await this.updateVariantAndInventory(
+            variant,
+            storeId,
+            updateDto.business_id as string,
+          );
+        } else {
+          await this.createVariantAndInventory(
+            productId,
+            variant,
+            storeId,
+            updateDto.business_id as string,
           );
         }
-        product.variants = variants || [];
       }
 
-      const appliedDiscountsProducts =
-        await this.discountsService.applyDiscounts(storeId, products);
+      // Step 3: Handle removed variants
+      if (updateDto.removedVariantIds?.length > 0) {
+        await this.removeVariants(updateDto.removedVariantIds, storeId);
+      }
 
-      return { products: appliedDiscountsProducts };
-    } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      )
-        throw error;
-      this.logger.error('Error retrieving products: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error retrieving products',
-      );
+      return { message: 'Product and variants updated successfully' };
+    } catch (err) {
+      this.errorHandler.handleServiceError(err, 'updateProductWithVariants');
     }
   }
 
-  /** Update product */
-  async updateProduct(productId: string, dto: UpdateProductDto) {
-    try {
-      this.validateUUID(productId, 'product ID');
-      const product = (await this.findProduct(productId)).product;
+  /**
+   * Update product details
+   */
+  private async updateProduct(productId: string, dto: UpdateProductDto) {
+    const { error } = await this.supabase
+      .from('products')
+      .update({
+        name: dto.name,
+        description: dto.description,
+        tags: dto.tags,
+        slug: generateSlug(dto.name),
+        category: dto.category,
+        brand: dto.brand,
+      })
+      .eq('id', productId);
 
-      // 1️⃣ Handle category
-      let categoryId = product.categoryId;
-      if (dto.category) {
-        categoryId = await this.handleCategory(dto);
-      }
-
-      // 2️⃣ Handle thumbnail
-      if (dto.thumbnail) {
-        dto.thumbnail = await this.handleThumbnail(product, dto.thumbnail);
-      }
-
-      // 3️⃣ Build update payload (only provided fields)
-      const updatePayload: any = { updatedAt: new Date() };
-      if (dto.name) {
-        updatePayload.name = dto.name;
-        updatePayload.slug = generateSlug(dto.name);
-      }
-      if (dto.brand) updatePayload.brand = dto.brand;
-      if (dto.description) updatePayload.description = dto.description;
-      if (dto.tags) updatePayload.tags = dto.tags;
-      if (dto.attributes) updatePayload.attributes = dto.attributes;
-      if (categoryId) updatePayload.categoryId = categoryId;
-      if (dto.thumbnail) updatePayload.thumbnail = dto.thumbnail;
-
-      const { error: updateError } = await this.supabase
-        .from('products')
-        .update(updatePayload)
-        .eq('id', productId);
-
-      if (updateError) {
-        throw new BadRequestException(
-          'Supabase error updating product: ' + updateError.message,
-        );
-      }
-
-      // 4️⃣ Handle variants
-      if (dto.variants || dto.variantsToDelete) {
-        await this.handleVariants(product, productId, dto);
-      }
-
-      // 5️⃣ Return updated product
-      return await this.findProduct(productId);
-    } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException ||
-        error instanceof ConflictException
-      )
-        throw error;
-      this.logger.error('Error updating product: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error updating product',
-      );
-    }
+    if (error) throw new BadRequestException(error.message);
   }
 
-  /** Delete product */
-  async deleteProduct(productId: string) {
-    try {
-      this.validateUUID(productId, 'product ID');
-
-      // Fetch product variants
-      const variants = await this.getProductVariants(productId);
-
-      // Delete the product
-      const { data: deletedProduct, error: deleteError } = await this.supabase
-        .from('products')
-        .delete()
-        .eq('id', productId)
-        .select()
-        .maybeSingle();
-
-      // Throw error if error deleting product
-      if (deleteError) {
-        throw new BadRequestException(
-          `Supabase Error deleting product: ${deleteError.message}`,
-        );
-      }
-
-      // Throw error if product not found
-      if (!deletedProduct) {
-        throw new NotFoundException('Product does not exist');
-      }
-      const product = deletedProduct;
-
-      // Remove thumbnail of product from bucket
-      const path = getPathFromUrl(product.thumbnail);
-      await this.fileUploadService.deleteFile(path, 'products');
-
-      // Loop through each variants and delete it image from bucket
-
-      for (const variant of variants) {
-        const variantImagePath = getPathFromUrl(variant.imageUrl);
-        await this.fileUploadService.deleteFile(variantImagePath, 'products');
-      }
-
-      return { message: 'Product deleted successfully' };
-    } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      )
-        throw error;
-      this.logger.error('Error deleting product: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error deleting product',
-      );
-    }
-  }
-
-  /** Update product variant */
-  async updateProductVariant(
-    productId: string,
-    variantId: string,
-    updateVariantDto: any,
+  /**
+   * Update an existing variant + inventory
+   */
+  private async updateVariantAndInventory(
+    variant: any,
+    storeId: string,
+    businessId: string,
   ) {
-    this.validateUUID(productId, 'product ID');
-    this.validateUUID(variantId, 'variant ID');
+    // Check wants to change variant image
+    if (variant.image_file) {
+      // Delete previous image from storage
+      const previousPath = getPathFromUrl(variant.image_url);
+      await this.fileService.deleteFile(previousPath, 'products');
 
-    //  await this.getProductById(productId);
-
-    // new variant data
-    const newVariantData = {
-      productId,
-      sku: updateVariantDto.sku,
-      color: updateVariantDto.color,
-      size: updateVariantDto.size,
-      price: updateVariantDto.price,
-      weight: updateVariantDto.weight,
-      imageUrl: updateVariantDto.imageFile || updateVariantDto.imageUrl,
-      dimensions: updateVariantDto.dimensions,
-    };
-
-    // Update the variant
-    const { data: updatedVariant, error: updateError } = await this.supabase
-      .from('variants')
-      .update({ ...newVariantData, updatedAt: new Date() })
-      .match({ productId, id: variantId })
-      .select();
-
-    if (updateError) {
-      throw new BadRequestException(
-        `Supabase Error updating product variant: ${updateError.message}`,
-      );
-    }
-    if (!updatedVariant.length) {
-      throw new NotFoundException('Product variant does not exist');
-    }
-
-    // Update lowStockThreshold, reserved, for variant inventory if needs to change
-
-    if (updateVariantDto.reserved || updateVariantDto.lowStockThreshold) {
-      // Get variant + inventory
-      const varinatPlusInventory = await this.getProductVariant(
-        productId,
-        variantId,
-      );
-
-      const {
-        data: variantInventoryUpdated,
-        error: variantInventoryUpdateError,
-      } = await this.supabase
-        .from('inventories')
-        .update({
-          reserved:
-            updateVariantDto.reserved ||
-            varinatPlusInventory.inventories.reserved,
-          lowStockThreshold:
-            updateVariantDto.lowStockThreshold ||
-            varinatPlusInventory.inventories.lowStockThreshold,
-          updatedAt: new Date(),
-        })
-        .eq('variantId', variantId)
-        .select();
-      if (variantInventoryUpdateError) {
-        console.log(variantInventoryUpdateError);
-        throw new BadRequestException(`Supabase Error updating variant inventory:
-            ${variantInventoryUpdateError.message}`);
-      }
-    }
-    return updatedVariant[0];
-  }
-
-  /** Delete product variant */
-  async deleteProductVariant(productId: string, variantId: string) {
-    this.validateUUID(variantId, 'variant ID');
-
-    // Delete variant using productId and variantId
-    const { data: deletedVariant, error: deleteError } = await this.supabase
-      .from('variants')
-      .delete()
-      .match({ productId, id: variantId })
-      .select()
-      .maybeSingle();
-
-    // Throw an error if error deleting variant
-    if (deleteError) {
-      throw new BadRequestException(
-        `Supabase Error deleting product variant: ${deleteError.message}`,
-      );
-    }
-    // Throw an error if variant not found
-    if (!deletedVariant) {
-      throw new NotFoundException('Product variant does not exist');
-    }
-
-    // Delete inventory data belong to variant
-    const { data: deletedInventory, error: deleteInvError } =
-      await this.supabase
-        .from('inventories')
-        .delete()
-        .match({ variantId })
-        .select()
-        .maybeSingle();
-
-    // Throw an error if error deleting variant inventory
-    if (deleteInvError) {
-      throw new BadRequestException(
-        `Supabase Error deleting product variant inventory: ${deleteInvError.message}`,
-      );
-    }
-    // Throw an error if variant inventory not found
-    if (!deletedInventory) {
-      throw new NotFoundException('Product variant inventory does not exist');
-    }
-
-    // Remove variant image from bucket
-    const path = getPathFromUrl(deletedVariant.imageUrl);
-    await this.fileUploadService.deleteFile(path, 'products');
-
-    // return deletedVariant
-    return { deletedVariant, deletedInventory };
-  }
-
-  /** Add product variant */
-  async addProductVariant(productId: string, variant: Variant) {
-    try {
-      const product = await this.getProductById(productId);
-
-      // Check SKU uniqueness
-      const { data: existingVariant, error: fetchError } = await this.supabase
-        .from('variants')
-        .select('*')
-        .match({ sku: variant.sku })
-        .maybeSingle();
-
-      if (fetchError) {
-        throw new BadRequestException(
-          `Supabase Error checking product variant: ${fetchError.message}`,
-        );
-      }
-      if (existingVariant) {
-        throw new ConflictException(
-          `Product variant with ${variant.sku} SKU already exists`,
-        );
-      }
-
-      // upload file to bucket
-      const path = `stores/${product.stores.storeName}/${new Date().getTime()}_${variant.imageFile.originalname}`;
-      const imageUrl = await this.fileUploadService.uploadFile(
-        variant.imageFile,
-        path,
+      // Create new Image in storage
+      const newPath = `variants/${businessId}/${Date.now()}_${variant.sku}${variant.image_file.originalname}`;
+      const imageUrl = await this.fileService.uploadFile(
+        variant.image_file,
+        newPath,
         'products',
       );
-
-      // Create variant
-      const newVariantData = {
-        productId,
-        storeId: product.stores.id,
+      variant.image_url = imageUrl;
+    }
+    const { error: variantError } = await this.supabase
+      .from('product_variants')
+      .update({
+        name: variant.name,
         sku: variant.sku,
-        color: variant.color,
-        size: variant.size,
         price: variant.price,
-        weight: variant.weight,
-        imageUrl,
-        dimensions: variant.dimensions,
-      };
+        image_url: variant.image_url,
+        attributes: variant.attributes,
+      })
+      .eq('id', variant.id);
 
-      const { data: createdVariant, error: createError } = await this.supabase
-        .from('variants')
-        .insert([newVariantData])
-        .select();
+    if (variantError) throw new BadRequestException(variantError.message);
 
-      if (createError) {
-        throw new BadRequestException(
-          `Supabase Error creating product variant: ${createError.message}`,
-        );
-      }
+    const { error: inventoryError } = await this.supabase
+      .from('store_inventory')
+      .update({
+        low_stock_threshold: variant.inventory.low_stock_threshold,
+        reserved: variant.inventory.reserved,
+      })
+      .eq('variant_id', variant.id)
+      .eq('store_id', storeId);
 
-      // Create inventory
-      const { data: variantInventory, error: inventoryError } =
-        await this.supabase
-          .from('inventories')
-          .insert([
-            {
-              productId,
-              storeId: product.stores.id,
-              variantId: createdVariant[0].id,
-              stock: variant.stock,
-              reserved: variant.reserved ?? 0,
-              totalStock: variant.stock,
-              lowStockThreshold: variant.lowStockThreshold,
-            },
-          ])
-          .select();
-
-      if (inventoryError) {
-        throw new BadRequestException(
-          `Supabase Error creating inventory: ${inventoryError.message}`,
-        );
-      }
-
-      // Update the variant inventoryId field
-      const { data: updatedVariant, error: updatedVariantError } =
-        await this.supabase
-          .from('variants')
-          .update({ inventoryId: variantInventory[0].id })
-          .eq('id', createdVariant[0].id)
-          .select();
-      if (updatedVariantError) {
-        throw new BadRequestException(
-          `Supabase Error updating variant: ${updatedVariantError.message}`,
-        );
-      }
-
-      return {
-        ...updatedVariant[0],
-        inventories: variantInventory[0],
-      };
-    } catch (error) {
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      )
-        throw error;
-      this.logger.error('Error adding product variant: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error adding product variant',
-      );
-    }
+    if (inventoryError) throw new BadRequestException(inventoryError.message);
   }
 
-  async getProductVariant(productId: string, variantId: string) {
-    try {
-      this.validateUUID(variantId, 'Variant ID');
-      // const product = await this.getProductById(productId);
-
-      // Get product variant with productId and variantId
-      const { data: variant, error: fetchError } = await this.supabase
-        .from('variants')
-        .select('*, inventories(reserved, lowStockThreshold, stock)')
-        .match({ productId, id: variantId })
-        .maybeSingle();
-
-      if (fetchError) {
-        throw new BadRequestException(
-          `Supabase Error fetching product variant: ${fetchError.message}`,
-        );
-      }
-      if (!variant) {
-        throw new NotFoundException('Product variant does not exists');
-      }
-
-      // return variant
-      return variant;
-    } catch (error) {
-      if (error instanceof BadRequestException || NotFoundException)
-        throw error;
-      this.logger.error('Error fetching product variant: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error fetching product variant',
-      );
-    }
-  }
-
-  async getProductVariants(productId: string) {
-    try {
-      const { data: variants, error: fetchError } = await this.supabase
-        .from('variants')
-        .select('*')
-        .match({ productId });
-
-      if (fetchError) {
-        throw new BadRequestException(
-          `Supabase Error fetching product variants: ${fetchError.message}`,
-        );
-      }
-      if (variants.length === 0) {
-        throw new NotFoundException(
-          `No variants found for this product with this product ID ${productId}`,
-        );
-      }
-
-      // return variants
-      return variants;
-    } catch (error) {
-      if (error instanceof BadRequestException || NotFoundException)
-        throw error;
-      this.logger.error('Error fetching product variants: ', error.message);
-      throw new InternalServerErrorException(
-        'Unexpected error fetching product variants',
-      );
-    }
-  }
-
-  /* Helpers */
-  private async handleCategory(dto: UpdateProductDto): Promise<string> {
-    const { data, error } = await this.supabase
-      .from('categories')
-      .select('id')
-      .eq('name', dto.category)
-      .maybeSingle();
-
-    if (error)
-      throw new BadRequestException(
-        'Supabase error fetching category: ' + error.message,
-      );
-    if (data) return data.id;
-
-    // Create new category
-    const { data: newCategory, error: insertError } = await this.supabase
-      .from('categories')
-      .insert([{ name: dto.category, storeId: dto.storeId }])
-      .select();
-
-    if (insertError)
-      throw new BadRequestException(
-        'Supabase error creating category: ' + insertError.message,
-      );
-
-    return newCategory[0].id;
-  }
-
-  private async handleThumbnail(
-    product: any,
-    newThumbnail: Multer.File,
-  ): Promise<string> {
-    if (product.thumbnail) {
-      const prevPath = getPathFromUrl(product.thumbnail);
-      await this.fileUploadService.deleteFile(prevPath, 'products');
-    }
-
-    const path = `stores/${product.stores.storeName}/${Date.now()}_${
-      newThumbnail.originalname
-    }`;
-    return await this.fileUploadService.uploadFile(
-      newThumbnail,
+  /**
+   * Create a new variant + inventory
+   */
+  private async createVariantAndInventory(
+    productId: string,
+    variant: any,
+    storeId: string,
+    businessId: string,
+  ) {
+    // Create new Image in storage
+    const path = `variants/${businessId}/${Date.now()}_${variant.sku}${variant.image_file.originalname}`;
+    const imageUrl = await this.fileService.uploadFile(
+      variant.image_file,
       path,
       'products',
     );
+    variant.image_url = imageUrl;
+
+    const { data: newVariant, error: variantError } = await this.supabase
+      .from('product_variants')
+      .insert({
+        product_id: productId,
+        store_id: storeId,
+        name: variant.name,
+        sku: variant.sku,
+        price: variant.price,
+        image_url: variant.image_url,
+        attributes: variant.attributes,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (variantError) throw new BadRequestException(variantError.message);
+
+    const { error: inventoryError } = await this.supabase
+      .from('store_inventory')
+      .insert({
+        store_id: storeId,
+        variant_id: newVariant?.id,
+        quantity: variant.inventory.quantity || 0,
+        low_stock_threshold: variant.inventory.low_stock_threshold,
+        reserved: variant.inventory.reserved,
+      });
+
+    if (inventoryError) throw new BadRequestException(inventoryError.message);
   }
 
-  private async handleVariants(
-    product: any,
-    productId: string,
-    dto: UpdateProductDto,
-  ) {
-    // 1. Delete variants explicitly requested
-    if (dto.variantsToDelete && dto.variantsToDelete.length > 0) {
-      for (const variantId of dto.variantsToDelete) {
-        await this.deleteProductVariant(productId, variantId);
-      }
-    }
+  /**
+   * Remove variants (and inventory) by IDs
+   */
+  private async removeVariants(variantIds: string[], storeId: string) {
+    // First delete inventory records
+    const { error: inventoryError } = await this.supabase
+      .from('store_inventory')
+      .delete()
+      .in('variant_id', variantIds)
+      .eq('store_id', storeId);
 
-    // 2. Add/update variants
-    if (dto.variants) {
-      for (const variant of dto.variants) {
-        if (variant.id) {
-          await this.updateOrReplaceVariant(product, productId, variant);
-        } else {
-          await this.createVariant(product, productId, variant);
-        }
-      }
-    }
-  }
+    if (inventoryError) throw new BadRequestException(inventoryError.message);
 
-  private async updateOrReplaceVariant(
-    product: any,
-    productId: string,
-    variant: any,
-  ) {
-    const existingVariant = product.variants.find((v) => v.id === variant.id);
-    if (!existingVariant) return;
+    // Then delete variants
+    const { data: variants, error: variantError } = await this.supabase
+      .from('product_variants')
+      .delete()
+      .in('id', variantIds)
+      .select();
 
-    if (variant.imageFile) {
-      if (existingVariant.imageUrl) {
-        const prevPath = getPathFromUrl(existingVariant.imageUrl);
-        await this.fileUploadService.deleteFile(prevPath, 'products');
-      }
+    if (variantError) throw new BadRequestException(variantError.message);
 
-      const path = `stores/${product.stores.storeName}/${Date.now()}_${
-        variant.imageFile.originalname
-      }`;
-      variant.imageFile = await this.fileUploadService.uploadFile(
-        variant.imageFile,
-        path,
-        'products',
-      );
-    }
-
-    const { error } = await this.updateProductVariant(
-      productId,
-      variant.id,
-      variant,
-    );
-    if (error)
-      throw new BadRequestException(
-        'Supabase error updating variant: ' + error.message,
-      );
-  }
-
-  private async createVariant(product: any, productId: string, variant: any) {
-    // if (variant.imageFile) {
-    //   const path = `stores/${product.stores.storeName}/${Date.now()}_${
-    //     variant.imageFile.originalname
-    //   }`;
-    //   variant.imageFile = await this.fileUploadService.uploadFile(
-    //     variant.imageFile,
-    //     path,
-    //     'products',
-    //   );
-    // }
-    if (variant.imageFile) {
-      await this.addProductVariant(productId, variant);
+    // Loop through each variant and delete image from storage
+    for (const variant of variants) {
+      const path = getPathFromUrl(variant.image_url);
+      await this.fileService.deleteFile(path, 'products');
     }
   }
 }
