@@ -1,29 +1,29 @@
 import {
-  Injectable,
-  Inject,
-  InternalServerErrorException,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+    Injectable,
+    Inject,
+    InternalServerErrorException,
+    ConflictException,
+    BadRequestException,
+    NotFoundException,
+    Logger,
+    UnauthorizedException
+} from "@nestjs/common";
 
-import { HandleErrorService } from 'src/helpers/handle-error.helper';
-import { v4 as uuidv4 } from 'uuid';
-import { CreateStoreDto } from './dto/create-store.dto';
-import { Store } from './entities/store.entity';
-import { KafkaHelper } from '../../helpers/kafka.heper';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { UpdateStoreDto } from './dto/update-store.dto';
-import { Categories } from 'src/entities/category.entity';
-import { InviteUserDto } from './dto/invite-user.dto';
-import EventEmitter2 from 'eventemitter2';
-import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
-import { MailService } from 'src/utils/mail/mail.service';
-import { SendInviteDto } from './dto/send-invite.dto';
-import { Invite } from 'src/entities/invite.entity';
-import { generateExpiry } from 'src/utils/expiry';
+import { HandleErrorService } from "src/helpers/handle-error.helper";
+import { v4 as uuidv4 } from "uuid";
+import { CreateStoreDto } from "./dto/create-store.dto";
+import { Store } from "./entities/store.entity";
+import { KafkaHelper } from "../../helpers/kafka.heper";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { UpdateStoreDto } from "./dto/update-store.dto";
+import { Categories } from "src/entities/category.entity";
+import { InviteUserDto } from "./dto/invite-user.dto";
+import EventEmitter2 from "eventemitter2";
+import { EventEmitterHelper } from "src/helpers/event-emitter.helper";
+import { MailService } from "src/utils/mail/mail.service";
+import { SendInviteDto } from "./dto/send-invite.dto";
+import { Invite } from "src/entities/invite.entity";
+import { generateExpiry } from "src/utils/expiry";
 
 // @Injectable()
 // export class StoresService {
@@ -240,379 +240,402 @@ import { generateExpiry } from 'src/utils/expiry';
 
 @Injectable()
 export class StoresService {
-  constructor(
-    @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly errorHandler: HandleErrorService,
-    private readonly mailService: MailService,
-    private readonly eventEmitterHelper: EventEmitterHelper,
-  ) {}
+    constructor(
+        @Inject("SUPABASE_CLIENT") private readonly supabase: SupabaseClient,
+        private readonly errorHandler: HandleErrorService,
+        private readonly mailService: MailService,
+        private readonly eventEmitterHelper: EventEmitterHelper
+    ) {}
 
-  /* CREATE STORE METHOD */
-  async createStore(dto: CreateStoreDto): Promise<Store | undefined> {
-    try {
-      // Check if store with same name and business_id exists for the business
-      if (
-        await this.doStoreExists(dto.business_id, dto.store_name, dto.location)
-      ) {
-        throw new ConflictException(
-          'Store with this business ID, name and location already exists',
-        );
-      }
+    /* CREATE STORE METHOD */
+    async createStore(dto: CreateStoreDto): Promise<Store | undefined> {
+        try {
+            // Check if store with same name and business_id exists for the business
+            if (
+                await this.doStoreExists(
+                    dto.business_id,
+                    dto.store_name,
+                    dto.location
+                )
+            ) {
+                throw new ConflictException(
+                    "Store with this business ID, name and location already exists"
+                );
+            }
 
-      // Define a store data
-      const store = {
-        id: uuidv4(),
-        business_id: dto.business_id,
-        name: dto.store_name,
-        timezone: dto.timezone,
-        currency: dto.currency,
-        location: dto.location,
-        created_at: new Date().toISOString(),
-      };
+            // Define a store data
+            const store = {
+                id: uuidv4(),
+                business_id: dto.business_id,
+                name: dto.store_name,
+                timezone: dto.timezone,
+                currency: dto.currency,
+                location: dto.location,
+                created_at: new Date().toISOString()
+            };
 
-      // Insert into Supabase
-      const { error: createError } = await this.supabase
-        .from('stores')
-        .insert([store]);
+            // Insert into Supabase
+            const { error: createError } = await this.supabase
+                .from("stores")
+                .insert([store]);
 
-      if (createError) {
-        throw new BadRequestException(createError.message);
-      }
+            if (createError) {
+                throw new BadRequestException(createError.message);
+            }
 
-      // // Emit Kafka event
-      // await this.kafkaHelper.emitEvent(
-      //   'store.events',
-      //   store.business_id,
-      //   'StoreCreated',
-      //   store,
-      // );
+            // // Emit Kafka event
+            // await this.kafkaHelper.emitEvent(
+            //   'store.events',
+            //   store.business_id,
+            //   'StoreCreated',
+            //   store,
+            // );
 
-      return store;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'createStore');
-    }
-  }
-
-  /**  FIND A STORE METHOD */
-  async findStore(storeId: string): Promise<Store | undefined> {
-    try {
-      const store = await this.getStore(storeId);
-      if (!store) {
-        throw new NotFoundException("Can't find a store with this store ID");
-      }
-      return store;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'findStore');
-    }
-  }
-
-  /** FIND ALL STORES FOR A BUSINESS */
-  async findAllStores(businessId: string): Promise<Store[] | undefined> {
-    try {
-      const { data: stores, error: fetchError } = await this.supabase
-        .from('stores')
-        .select('*')
-        .eq('business_id', businessId);
-
-      if (fetchError) {
-        throw new BadRequestException(fetchError.message);
-      }
-
-      if (stores.length === 0) {
-        return [];
-      }
-
-      return stores;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'findAllStores');
-    }
-  }
-
-  /** FIND STORE AND UPDATE */
-  async updateStore(
-    storeId: string,
-    dto: UpdateStoreDto,
-  ): Promise<Store | undefined> {
-    try {
-      // returns a store , throws an error when not found
-      await this.getStore(storeId);
-
-      // Update store with the new data
-      const { data: updatedStore, error: updateError } = await this.supabase
-        .from('stores')
-        .update({ ...dto, updated_at: new Date().toISOString() })
-        .eq('id', storeId)
-        .select()
-        .maybeSingle();
-
-      if (updateError) {
-        throw new BadRequestException(updateError.message);
-      }
-
-      return updatedStore;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'updateStore');
-    }
-  }
-
-  /** DELETE STORE METHOD  */
-  async deleteStore(storeId: string): Promise<Store | undefined> {
-    try {
-      // returns a store or throws an error when not found
-      await this.getStore(storeId);
-
-      // Delete store
-      const { data: deletedStore, error: deleteError } = await this.supabase
-        .from('stores')
-        .delete()
-        .eq('id', storeId)
-        .select()
-        .maybeSingle();
-
-      if (deleteError) {
-        throw new BadRequestException(deleteError.message);
-      }
-
-      return deletedStore;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'deleteStore');
-    }
-  }
-
-  async getStoreProductsCategories(
-    storeId: string,
-  ): Promise<Categories | undefined> {
-    try {
-      const { data, error } = await this.supabase
-        .from('categories')
-        .select('name')
-        .eq('storeId', storeId);
-
-      if (error) {
-        throw new BadRequestException(error.message);
-      }
-
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      return data.map((category) => category.name);
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'getStoreProductsCategories');
-    }
-  }
-  /**  SENDS A INVITE EMAIL */
-  async sendInvite(dto: SendInviteDto): Promise<Invite | undefined> {
-    try {
-      // 1. Check if store exists
-      const store = await this.getStore(dto.store_id as string);
-
-      if (!store) {
-        throw new UnauthorizedException(
-          'You are unauthorized to send invite email with unknown store ID',
-        );
-      }
-      // 2. Check if invited user already exists in store
-      if (await this.doUserExistsInStore(dto.store_id as string, dto.email)) {
-        throw new ConflictException(
-          "Can't send an invite to a user who already exists in a store",
-        );
-      }
-      // 2. Check if invite exists
-      const { data: existingInvite, error: fetchError } = await this.supabase
-        .from('invites')
-        .select('id')
-        .match({
-          store_id: dto.store_id,
-          business_id: dto.business_id,
-          email: dto.email,
-        })
-        .maybeSingle();
-      if (fetchError) {
-        throw new BadRequestException(fetchError.message);
-      }
-      if (existingInvite) {
-        throw new ConflictException('Invite for this email already exists');
-      }
-
-      // 2. Define invite data
-      const inviteData: Invite = {
-        id: uuidv4(),
-        business_id: dto.business_id,
-        store_id: dto.store_id as string,
-        role: dto.role,
-        email: dto.email,
-        invited_by: dto.invitedBy,
-        expires_at: generateExpiry(72), // generate 3hours expiry time,
-        created_at: new Date().toISOString(),
-      };
-
-      // 3. Insert invite data to database
-      const { error: createInviteError } = await this.supabase
-        .from('invites')
-        .insert(inviteData);
-      if (createInviteError) {
-        throw new BadRequestException(createInviteError.message);
-      }
-
-      // 4. Emit a user.events (UserInviteSend)
-      await this.eventEmitterHelper.emitEvent(
-        'user.events',
-        dto.store_id as string,
-        'UserInviteSend',
-        {
-          ...inviteData,
-          store_name: dto.store_name,
-          location: dto.location,
-        },
-      );
-
-      return inviteData;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'sendInvite');
-    }
-  }
-
-  /** INVITES A USER TO JOIN A STORE */
-
-  async inviteUser(storeId: string, dto: InviteUserDto) {
-    try {
-      // 1. Check if invite already exists for this store + email
-      const { data: existingInvite, error: inviteError } = await this.supabase
-        .from('invites')
-        .select('id, user_id, role, status')
-        .eq('store_id', storeId)
-        .eq('email', dto.email)
-        .maybeSingle();
-
-      if (inviteError) throw new BadRequestException(inviteError.message);
-
-      if (existingInvite) {
-        return {
-          message: 'This user already has an invite or role in this store',
-          store_user: existingInvite,
-        };
-      }
-
-      // 2. Check if user exists in users table
-      const { data: existingUser, error: userError } = await this.supabase
-        .from('users')
-        .select('*')
-        .eq('email', dto.email)
-        .maybeSingle();
-
-      if (userError) throw new BadRequestException(userError.message);
-
-      let userId: string;
-
-      if (!existingUser) {
-        // 3a. Create user in Supabase Auth
-        const { data: authUser, error: authError } =
-          await this.supabase.auth.admin.createUser({
-            email: dto.email,
-            password: dto.password,
-            email_confirm: true,
-            user_metadata: { name: dto.name },
-          });
-
-        if (authError) throw new BadRequestException(authError.message);
-
-        userId = authUser.user.id;
-
-        // 3b. Insert into users table
-        const { error: insertError } = await this.supabase
-          .from('users')
-          .insert({
-            id: userId,
-            email: dto.email,
-            name: dto.name,
-            status: 'invited',
-            business_id: dto.business_id,
-          });
-
-        if (insertError) throw new BadRequestException(insertError.message);
-      } else {
-        userId = existingUser.id;
-      }
-
-      // 4. Emit UserAssignedRole event
-      this.eventEmitterHelper.emitEvent(
-        'user.events',
-        dto.business_id,
-        'UserAssignedRole',
-        {
-          business_id: dto.business_id,
-          store_id: storeId,
-          user_id: userId,
-          email: dto.email,
-          role: dto.role,
-          status: 'pending',
-        },
-      );
-
-      return { message: 'User invited successfully', user_id: userId };
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'inviteUser');
-    }
-  }
-
-  /** Helpers method */
-
-  // Check if user exists in a store
-  private async doUserExistsInStore(
-    storeId: string,
-    email: string,
-  ): Promise<boolean> {
-    const { data: existingStoreMember, error: fetchError } = await this.supabase
-      .from('store_users')
-      .select('id')
-      .match({
-        store_id: storeId,
-        email,
-      })
-      .maybeSingle();
-    if (fetchError) {
-      throw new BadRequestException(fetchError.message);
-    }
-    if (existingStoreMember) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-  // Check store exists
-  private async doStoreExists(
-    business_id: string,
-    name: string,
-    location,
-  ): Promise<boolean> {
-    const { data: existsStore, error: existsError } = await this.supabase
-      .from('stores')
-      .select('id')
-      .match({ business_id, name, location })
-      .maybeSingle();
-
-    if (existsError) {
-      throw new BadRequestException('Error checking store existence');
+            return store;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "createStore");
+        }
     }
 
-    return existsStore !== null;
-  }
-
-  // Get a store
-  private async getStore(storeId: string): Promise<Store | undefined> {
-    const { data: store, error: fetchError } = await this.supabase
-      .from('stores')
-      .select('*')
-      .eq('id', storeId)
-      .maybeSingle();
-    if (fetchError) {
-      throw new BadRequestException(fetchError.message);
+    /**  FIND A STORE METHOD */
+    async findStore(storeId: string): Promise<Store | undefined> {
+        try {
+            const store = await this.getStore(storeId);
+            if (!store) {
+                throw new NotFoundException(
+                    "Can't find a store with this store ID"
+                );
+            }
+            return store;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "findStore");
+        }
     }
 
-    if (!store) {
-      return undefined;
+    /** FIND ALL STORES FOR A BUSINESS */
+    async findAllStores(businessId: string): Promise<Store[] | undefined> {
+        try {
+            const { data: stores, error: fetchError } = await this.supabase
+                .from("stores")
+                .select("*")
+                .eq("business_id", businessId);
+
+            if (fetchError) {
+                throw new BadRequestException(fetchError.message);
+            }
+
+            if (stores.length === 0) {
+                return [];
+            }
+
+            return stores;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "findAllStores");
+        }
     }
-    return store;
-  }
+
+    /** FIND STORE AND UPDATE */
+    async updateStore(
+        storeId: string,
+        dto: UpdateStoreDto
+    ): Promise<Store | undefined> {
+        try {
+            // returns a store , throws an error when not found
+            await this.getStore(storeId);
+
+            // Update store with the new data
+            const { data: updatedStore, error: updateError } =
+                await this.supabase
+                    .from("stores")
+                    .update({ ...dto, updated_at: new Date().toISOString() })
+                    .eq("id", storeId)
+                    .select()
+                    .maybeSingle();
+
+            if (updateError) {
+                throw new BadRequestException(updateError.message);
+            }
+
+            return updatedStore;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "updateStore");
+        }
+    }
+
+    /** DELETE STORE METHOD  */
+    async deleteStore(storeId: string): Promise<Store | undefined> {
+        try {
+            // returns a store or throws an error when not found
+            await this.getStore(storeId);
+
+            // Delete store
+            const { data: deletedStore, error: deleteError } =
+                await this.supabase
+                    .from("stores")
+                    .delete()
+                    .eq("id", storeId)
+                    .select()
+                    .maybeSingle();
+
+            if (deleteError) {
+                throw new BadRequestException(deleteError.message);
+            }
+
+            return deletedStore;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "deleteStore");
+        }
+    }
+
+    async getStoreProductsCategories(
+        storeId: string
+    ): Promise<Categories | undefined> {
+        try {
+            const { data, error } = await this.supabase
+                .from("categories")
+                .select("name")
+                .eq("storeId", storeId);
+
+            if (error) {
+                throw new BadRequestException(error.message);
+            }
+
+            if (!data || data.length === 0) {
+                return [];
+            }
+
+            return data.map(category => category.name);
+        } catch (error) {
+            this.errorHandler.handleServiceError(
+                error,
+                "getStoreProductsCategories"
+            );
+        }
+    }
+    /**  SENDS A INVITE EMAIL */
+    async sendInvite(dto: SendInviteDto): Promise<Invite | undefined> {
+        try {
+            // 1. Check if store exists
+            const store = await this.getStore(dto.store_id as string);
+
+            if (!store) {
+                throw new UnauthorizedException(
+                    "You are unauthorized to send invite email with unknown store ID"
+                );
+            }
+            // 2. Check if invited user already exists in store
+            if (
+                await this.doUserExistsInStore(
+                    dto.store_id as string,
+                    dto.email
+                )
+            ) {
+                throw new ConflictException(
+                    "Can't send an invite to a user who already exists in a store"
+                );
+            }
+            // 2. Check if invite exists
+            const { data: existingInvite, error: fetchError } =
+                await this.supabase
+                    .from("invites")
+                    .select("id")
+                    .match({
+                        store_id: dto.store_id,
+                        business_id: dto.business_id,
+                        email: dto.email
+                    })
+                    .maybeSingle();
+            if (fetchError) {
+                throw new BadRequestException(fetchError.message);
+            }
+            if (existingInvite) {
+                throw new ConflictException(
+                    "Invite for this email already exists"
+                );
+            }
+
+            // 2. Define invite data
+            const inviteData: Invite = {
+                id: uuidv4(),
+                business_id: dto.business_id,
+                store_id: dto.store_id as string,
+                role: dto.role,
+                email: dto.email,
+                invited_by: dto.invitedBy,
+                expires_at: generateExpiry(72), // generate 3hours expiry time,
+                created_at: new Date().toISOString()
+            };
+
+            // 3. Insert invite data to database
+            const { error: createInviteError } = await this.supabase
+                .from("invites")
+                .insert(inviteData);
+            if (createInviteError) {
+                throw new BadRequestException(createInviteError.message);
+            }
+
+            // 4. Emit a user.events (UserInviteSend)
+            await this.eventEmitterHelper.emitEvent(
+                "user.events",
+                dto.store_id as string,
+                "UserInviteSend",
+                {
+                    ...inviteData,
+                    store_name: dto.store_name,
+                    location: dto.location
+                }
+            );
+
+            return inviteData;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "sendInvite");
+        }
+    }
+
+    /** INVITES A USER TO JOIN A STORE */
+
+    async inviteUser(storeId: string, dto: InviteUserDto) {
+        try {
+            // 1. Check if invite already exists for this store + email
+            const { data: existingInvite, error: inviteError } =
+                await this.supabase
+                    .from("invites")
+                    .select("id, user_id, role, status")
+                    .eq("id", dto.invite_id)
+                    .eq("email", dto.email)
+                    .maybeSingle();
+
+            if (inviteError) throw new BadRequestException(inviteError.message);
+
+            if (!existingInvite) {
+                throw new UnauthorizedException(
+                    "There is no invite for this email"
+                );
+            }
+
+            // 2. Check if user exists in users table
+            const { data: existingUser, error: userError } = await this.supabase
+                .from("users")
+                .select("*")
+                .eq("email", dto.email)
+                .maybeSingle();
+
+            if (userError) throw new BadRequestException(userError.message);
+
+            if (existingUser) {
+                throw new ConflictException(
+                    "Invited user with this email already exists in store"
+                );
+            }
+            // 3a. Create user in Supabase Auth
+            const { data: authUser, error: authError } =
+                await this.supabase.auth.admin.createUser({
+                    email: dto.email,
+                    password: dto.password,
+                    email_confirm: true,
+                    user_metadata: { name: dto.name }
+                });
+
+            if (authError) throw new BadRequestException(authError.message);
+
+            // 3b. Insert into users table
+            const { error: insertError } = await this.supabase
+                .from("users")
+                .insert({
+                    id: authUser.user.id,
+                    email: dto.email,
+                    name: dto.name,
+                    status: "invited",
+                    business_id: dto.business_id
+                });
+
+            if (insertError) throw new BadRequestException(insertError.message);
+
+            // 4. Emit UserAssignedRole event
+            this.eventEmitterHelper.emitEvent(
+                "user.events",
+                dto.business_id,
+                "UserAssignedRole",
+                {
+                    business_id: dto.business_id,
+                    store_id: storeId,
+                    user_id: userId,
+                    email: dto.email,
+                    role: dto.role,
+                    status: "active"
+                }
+            );
+            // 5. Delete invite from supabase
+            const { error: deleteError } = await this.supabase
+                .from("invites")
+                .delete()
+                .eq("id", dto.invite_id);
+            if (deleteError) throw new BadRequestException(deleteError.message);
+
+            return { message: "User invited successfully", user_id: userId };
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "inviteUser");
+        }
+    }
+
+    /** Helpers method */
+
+    // Check if user exists in a store
+    private async doUserExistsInStore(
+        storeId: string,
+        email: string
+    ): Promise<boolean> {
+        const { data: existingStoreMember, error: fetchError } =
+            await this.supabase
+                .from("store_users")
+                .select("id")
+                .match({
+                    store_id: storeId,
+                    email
+                })
+                .maybeSingle();
+        if (fetchError) {
+            throw new BadRequestException(fetchError.message);
+        }
+        if (existingStoreMember) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    // Check store exists
+    private async doStoreExists(
+        business_id: string,
+        name: string,
+        location
+    ): Promise<boolean> {
+        const { data: existsStore, error: existsError } = await this.supabase
+            .from("stores")
+            .select("id")
+            .match({ business_id, name, location })
+            .maybeSingle();
+
+        if (existsError) {
+            throw new BadRequestException("Error checking store existence");
+        }
+
+        return existsStore !== null;
+    }
+
+    // Get a store
+    private async getStore(storeId: string): Promise<Store | undefined> {
+        const { data: store, error: fetchError } = await this.supabase
+            .from("stores")
+            .select("*")
+            .eq("id", storeId)
+            .maybeSingle();
+        if (fetchError) {
+            throw new BadRequestException(fetchError.message);
+        }
+
+        if (!store) {
+            return undefined;
+        }
+        return store;
+    }
 }

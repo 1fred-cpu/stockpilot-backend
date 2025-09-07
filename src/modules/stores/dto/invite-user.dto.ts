@@ -16,4 +16,7 @@ export class InviteUserDto {
 
   @IsUUID()
   business_id: string;
+  
+  @IsUUID()
+  invite_id: string;
 }
