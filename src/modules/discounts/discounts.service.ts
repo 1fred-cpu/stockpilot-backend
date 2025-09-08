@@ -234,7 +234,7 @@ export class DiscountsService {
           productDiscount || categoryDiscount || storeDiscount || null;
 
         // Process each variant
-        const variants = (product.variants || []).map((variant) => {
+        const variants = (product.product_variants || []).map((variant) => {
           let finalPrice = variant.price;
           let discountApplied = 0;
 
