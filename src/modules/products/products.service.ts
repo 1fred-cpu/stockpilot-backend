@@ -15,6 +15,7 @@ import { Product } from 'src/entities/product.entity';
 import { VariantsService } from './variants.service';
 import { getPathFromUrl } from 'src/utils/get-path';
 import { FileUploadService } from 'src/utils/upload-file';
+import { Multer } from 'multer';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -35,6 +36,15 @@ export class ProductsService {
     dto: CreateProductDto,
   ): Promise<Product | undefined> {
     try {
+      // Upload thumbnail file and get url
+
+      const path = `variants/${businessId}/${Date.now()}_${dto.thumbnail.originalname}`;
+      const thumbnailUrl = await this.fileService.uploadFile(
+        dto.thumbnail,
+        path,
+        'products',
+      );
+
       const id = uuidv4();
       const payload = {
         id,
@@ -43,6 +53,7 @@ export class ProductsService {
         description: dto.description ?? null,
         category: dto.category ?? null,
         brand: dto.brand ?? null,
+        thumbnail: thumbnailUrl,
         tags: dto.tags ?? [],
         slug: generateSlug(dto.name),
         created_at: new Date().toISOString(),
@@ -260,25 +271,6 @@ export class ProductsService {
     }
   }
 
-  async update(productId: string, dto: UpdateProductDto) {
-    const updatePayload: any = { ...dto, updated_at: new Date().toISOString() };
-    const { error } = await this.supabase
-      .from('products')
-      .update(updatePayload)
-      .eq('id', productId);
-    if (error) throw new BadRequestException(error.message);
-    return { message: 'Product updated' };
-  }
-
-  async remove(productId: string) {
-    const { error } = await this.supabase
-      .from('products')
-      .delete()
-      .eq('id', productId);
-    if (error) throw new BadRequestException(error.message);
-    return { message: 'Product removed' };
-  }
-
   /**
    *
    * @param businessId
@@ -354,7 +346,7 @@ export class ProductsService {
       await this.updateProduct(productId, updateDto);
 
       // Step 2: Process variants (update, add, or remove)
-      for (const variant of updateDto.variants as any) {
+      for (const variant of updateDto.variants) {
         if (variant.id) {
           await this.updateVariantAndInventory(
             variant,
@@ -386,6 +378,14 @@ export class ProductsService {
    * Update product details
    */
   private async updateProduct(productId: string, dto: UpdateProductDto) {
+    // find category
+    const categoryId = await this.handleCategory(dto);
+
+    // update thumbnail
+    if (dto.thumbnail) {
+      dto.thumbnail = await this.handleThumbnail(dto, dto.thumbnail);
+    }
+
     const { error } = await this.supabase
       .from('products')
       .update({
@@ -394,11 +394,55 @@ export class ProductsService {
         tags: dto.tags,
         slug: generateSlug(dto.name),
         category: dto.category,
+        thumbnail: dto.thumbnail,
+        categoryId,
         brand: dto.brand,
       })
       .eq('id', productId);
 
     if (error) throw new BadRequestException(error.message);
+  }
+
+  private async handleCategory(dto: UpdateProductDto): Promise<string> {
+    const { data, error } = await this.supabase
+      .from('categories')
+      .select('id')
+      .eq('name', dto.category)
+      .maybeSingle();
+
+    if (error)
+      throw new BadRequestException(
+        'Supabase error fetching category: ' + error.message,
+      );
+    if (data) return data.id;
+
+    // Create new category
+    const { data: newCategory, error: insertError } = await this.supabase
+      .from('categories')
+      .insert([{ name: dto.category, store_id: dto.store_id }])
+      .select();
+
+    if (insertError)
+      throw new BadRequestException(
+        'Supabase error creating category: ' + insertError.message,
+      );
+
+    return newCategory[0].id;
+  }
+
+  private async handleThumbnail(
+    dto: any,
+    newThumbnail: Multer.File,
+  ): Promise<string> {
+    if (dto.thumbnail) {
+      const prevPath = getPathFromUrl(dto.thumbnail);
+      await this.fileService.deleteFile(prevPath, 'products');
+    }
+
+    const path = `variants/${dto.business_id}/${Date.now()}_${
+      newThumbnail.originalname
+    }`;
+    return await this.fileService.uploadFile(newThumbnail, path, 'products');
   }
 
   /**

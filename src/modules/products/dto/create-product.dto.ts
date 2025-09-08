@@ -10,8 +10,12 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
+import { Multer } from 'multer';
 export class CreateVariantDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
   @IsString()
   name: string;
 
@@ -57,15 +61,15 @@ export class CreateProductDto {
   @IsString()
   name: string;
 
-  @IsOptional()
   @IsString()
   description?: string;
 
   @IsOptional()
+  thumbnail?: Multer.File;
+
   @IsString()
   category?: string;
 
-  @IsOptional()
   @IsString()
   brand?: string;
 
