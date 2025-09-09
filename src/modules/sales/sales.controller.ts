@@ -17,10 +17,10 @@ import { UpdateSaleDto } from './dto/update-sale.dto';
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
-  @Post()
-  async createSale(@Body(ValidationPipe) createSaleDto: CreateSaleDto) {
-    return this.salesService.createSale(createSaleDto);
-  }
+//   @Post()
+//   async createSale(@Body(ValidationPipe) createSaleDto: CreateSaleDto) {
+//     return this.salesService.createSale(createSaleDto);
+//   }
 
   @Get()
   async getSales(

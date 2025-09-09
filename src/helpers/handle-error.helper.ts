@@ -17,7 +17,8 @@ export class HandleErrorService {
       error instanceof BadRequestException ||
       error instanceof NotFoundException ||
       error instanceof ConflictException ||
-      error instanceof UnauthorizedException
+      error instanceof UnauthorizedException ||
+      error instanceof InternalServerErrorException 
     ) {
       throw error;
     }

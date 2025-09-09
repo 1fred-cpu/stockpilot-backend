@@ -20,158 +20,158 @@ export class SalesService {
     private readonly inventoryService: InventoryService,
   ) {}
 
-  async createSale(createSaleDto: CreateSaleDto) {
-    try {
-      const { storeId, saleDate, sales } = createSaleDto;
+  // async createSale(createSaleDto: CreateSaleDto) {
+  //   try {
+  //     const { storeId, saleDate, sales } = createSaleDto;
 
-      // 1. Validate store ID
-      if (!isValidUUID(storeId)) {
-        throw new BadRequestException('Invalid storeId format');
-      }
+  //     // 1. Validate store ID
+  //     if (!isValidUUID(storeId)) {
+  //       throw new BadRequestException('Invalid storeId format');
+  //     }
 
-      // 2. Check if store exists
-      const { data: store, error: storeError } = await this.supabase
-        .from('stores')
-        .select('id')
-        .eq('id', storeId)
-        .maybeSingle();
+  //     // 2. Check if store exists
+  //     const { data: store, error: storeError } = await this.supabase
+  //       .from('stores')
+  //       .select('id')
+  //       .eq('id', storeId)
+  //       .maybeSingle();
 
-      if (storeError) {
-        throw new BadRequestException(
-          `Error checking store: ${storeError.message}`,
-        );
-      }
-      if (!store) {
-        throw new NotFoundException('Store does not exist');
-      }
+  //     if (storeError) {
+  //       throw new BadRequestException(
+  //         `Error checking store: ${storeError.message}`,
+  //       );
+  //     }
+  //     if (!store) {
+  //       throw new NotFoundException('Store does not exist');
+  //     }
 
-      const createdSales: any[] = [];
+  //     const createdSales: any[] = [];
 
-      for (const sale of sales) {
-        const {
-          idempotencyKey,
-          productId,
-          inventoryId,
-          variantId,
-          quantity,
-          type,
-        } = sale;
+  //     for (const sale of sales) {
+  //       const {
+  //         idempotencyKey,
+  //         productId,
+  //         inventoryId,
+  //         variantId,
+  //         quantity,
+  //         type,
+  //       } = sale;
 
-        // 3. Validate idempotency key
-        if (!idempotencyKey) {
-          throw new BadRequestException('idempotencyKey is required');
-        }
+  //       // 3. Validate idempotency key
+  //       if (!idempotencyKey) {
+  //         throw new BadRequestException('idempotencyKey is required');
+  //       }
 
-        // 4. Validate product exists in the store
-        const { data: product, error: productError } = await this.supabase
-          .from('products')
-          .select('id')
-          .match({ id: productId, storeId })
-          .maybeSingle();
+  //       // 4. Validate product exists in the store
+  //       const { data: product, error: productError } = await this.supabase
+  //         .from('products')
+  //         .select('id')
+  //         .match({ id: productId, storeId })
+  //         .maybeSingle();
 
-        if (productError) {
-          throw new BadRequestException(
-            `Error checking product: ${productError.message}`,
-          );
-        }
-        if (!product) {
-          throw new NotFoundException(
-            `Product with ID ${productId} not found in this store`,
-          );
-        }
+  //       if (productError) {
+  //         throw new BadRequestException(
+  //           `Error checking product: ${productError.message}`,
+  //         );
+  //       }
+  //       if (!product) {
+  //         throw new NotFoundException(
+  //           `Product with ID ${productId} not found in this store`,
+  //         );
+  //       }
 
-        // 5. Check for duplicate sale using idempotency key
-        const { data: existingMovement, error: movementError } =
-          await this.supabase
-            .from('stock_movements')
-            .select('id')
-            .eq('idempotencyKey', idempotencyKey)
-            .maybeSingle();
+  //       // 5. Check for duplicate sale using idempotency key
+  //       const { data: existingMovement, error: movementError } =
+  //         await this.supabase
+  //           .from('stock_movements')
+  //           .select('id')
+  //           .eq('idempotencyKey', idempotencyKey)
+  //           .maybeSingle();
 
-        if (movementError) {
-          throw new BadRequestException(
-            `Error checking stock movement: ${movementError.message}`,
-          );
-        }
-        if (existingMovement) {
-          this.logger.warn(`Duplicate sale skipped: ${idempotencyKey}`);
-          continue;
-        }
+  //       if (movementError) {
+  //         throw new BadRequestException(
+  //           `Error checking stock movement: ${movementError.message}`,
+  //         );
+  //       }
+  //       if (existingMovement) {
+  //         this.logger.warn(`Duplicate sale skipped: ${idempotencyKey}`);
+  //         continue;
+  //       }
 
-        // 6. Create sale record
-        const { data: newSale, error: createError } = await this.supabase
-          .from('sales')
-          .upsert({
-            ...sale,
-            storeId,
-            variantId: variantId,
-            customer: sale.customer.name,
-            saleDate: new Date(saleDate),
-          })
-          .select()
-          .maybeSingle();
+  //       // 6. Create sale record
+  //       const { data: newSale, error: createError } = await this.supabase
+  //         .from('sales')
+  //         .upsert({
+  //           ...sale,
+  //           storeId,
+  //           variantId: variantId,
+  //           customer: sale.customer.name,
+  //           saleDate: new Date(saleDate),
+  //         })
+  //         .select()
+  //         .maybeSingle();
 
-        if (createError) {
-          throw new BadRequestException(
-            `Error creating sale: ${createError.message}`,
-          );
-        }
+  //       if (createError) {
+  //         throw new BadRequestException(
+  //           `Error creating sale: ${createError.message}`,
+  //         );
+  //       }
 
-        // 7. Create a customer
-        const { data: existsCustomer, error: existsError } = await this.supabase
-          .from('customers')
-          .select('*')
-          .match({
-            name: sale.customer.name,
-            email: sale.customer.email,
-            phoneNumber: sale.customer.phoneNumber,
-          })
-          .maybeSingle();
-        if (existsError) {
-          throw new BadRequestException(`Error checking customer:
-                  ${existsError.message}`);
-        }
+  //       // 7. Create a customer
+  //       const { data: existsCustomer, error: existsError } = await this.supabase
+  //         .from('customers')
+  //         .select('*')
+  //         .match({
+  //           name: sale.customer.name,
+  //           email: sale.customer.email,
+  //           phoneNumber: sale.customer.phoneNumber,
+  //         })
+  //         .maybeSingle();
+  //       if (existsError) {
+  //         throw new BadRequestException(`Error checking customer:
+  //                 ${existsError.message}`);
+  //       }
 
-        if (!existsCustomer) {
-          const { error: customerError } = await this.supabase
-            .from('customers')
-            .upsert({
-              storeId: createSaleDto.storeId,
-              name: sale.customer.name,
-              email: sale.customer.email,
-              phoneNumber: sale.customer.phoneNumber,
-            });
-          if (customerError) {
-            throw new BadRequestException(`Error creating customer:
-                      ${customerError.message}`);
-          }
-        }
+  //       if (!existsCustomer) {
+  //         const { error: customerError } = await this.supabase
+  //           .from('customers')
+  //           .upsert({
+  //             storeId: createSaleDto.storeId,
+  //             name: sale.customer.name,
+  //             email: sale.customer.email,
+  //             phoneNumber: sale.customer.phoneNumber,
+  //           });
+  //         if (customerError) {
+  //           throw new BadRequestException(`Error creating customer:
+  //                     ${customerError.message}`);
+  //         }
+  //       }
 
-        // 8. Adjust stock
-        await this.inventoryService.stockMove({
-          inventoryId,
-          change: -quantity,
-          type,
-          idempotencyKey,
-        });
+  //       // 8. Adjust stock
+  //       await this.inventoryService.stockMove({
+  //         inventoryId,
+  //         change: -quantity,
+  //         type,
+  //         idempotencyKey,
+  //       });
 
-        createdSales.push(newSale);
-      }
+  //       createdSales.push(newSale);
+  //     }
 
-      return createdSales;
-    } catch (error) {
-      this.logger.error(`Error in createSale: ${error.message}`);
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        'An error occurred while creating sale record. Please try again later',
-      );
-    }
-  }
+  //     return createdSales;
+  //   } catch (error) {
+  //     this.logger.error(`Error in createSale: ${error.message}`);
+  //     if (
+  //       error instanceof BadRequestException ||
+  //       error instanceof NotFoundException
+  //     ) {
+  //       throw error;
+  //     }
+  //     throw new InternalServerErrorException(
+  //       'An error occurred while creating sale record. Please try again later',
+  //     );
+  //   }
+  // }
 
   async getSales(
     storeId: string,

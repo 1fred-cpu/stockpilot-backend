@@ -205,7 +205,7 @@ export class ProductsService {
         product_variants: data.product_variants || [],
       };
 
-      return this.discountsService.applyDiscounts(storeId, [product])[0];
+      return this.discountsService.applyDiscounts(storeId, [product]);
     } catch (err) {
       this.errorHandler.handleServiceError(err, 'findOne');
     }
