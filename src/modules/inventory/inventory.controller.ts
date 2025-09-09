@@ -1,18 +1,58 @@
-import { Controller, Post, Body, ValidationPipe } from "@nestjs/common";
-import { InventoryService } from "./inventory.service";
-import { StockChangeDto } from "./dto/stock-change.dto";
-import { RestockChangeDto } from "./dto/restock-change.dto";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Patch,
+  Delete,
+} from '@nestjs/common';
+import { InventoryService } from './inventory.service';
+import { RestockDto } from './dto/restock.dto';
+import { DeductStockDto } from './dto/deduct-stock.dto';
 
-@Controller("inventory")
+@Controller('inventory')
 export class InventoryController {
-    constructor(private readonly inventoryService: InventoryService) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
-    @Post("stock-move")
-    async stockMove(@Body(ValidationPipe) dto: StockChangeDto) {
-        return this.inventoryService.stockMove(dto);
-    }
-    @Post("restock-move")
-    async restockMove(@Body(ValidationPipe) dto: RestockChangeDto) {
-        return this.inventoryService.restockMove(dto);
-    }
+  /**
+   * Restock a variant (with or without batches)
+   */
+  @Post('restock')
+  async restock(@Body() dto: RestockDto) {
+    return this.inventoryService.restockVariant(dto);
+  }
+
+  /**
+   * Deduct stock (e.g., sales, refunds, wastage)
+   */
+  @Post('deduct')
+  async deductStock(@Body() dto: DeductStockDto) {
+    return this.inventoryService.deductStock(dto);
+  }
+
+  /**
+   * Get all inventory for a store
+   */
+  @Get('store/:storeId')
+  async getInventoryByStore(@Param('storeId') storeId: string) {
+    return this.inventoryService.getInventoryByStore(storeId);
+  }
+
+  /**
+   * Get all batches for a given variant
+   */
+  @Get('variant/:variantId/batches')
+  async getBatchesByVariant(@Param('variantId') variantId: string) {
+    return this.inventoryService.getBatchesByVariant(variantId);
+  }
+
+  /**
+   * Delete a batch manually (optional)
+   */
+  @Delete('batch/:batchId')
+  async deleteBatch(@Param('batchId') batchId: string) {
+    return this.inventoryService.deleteBatch(batchId);
+  }
 }
