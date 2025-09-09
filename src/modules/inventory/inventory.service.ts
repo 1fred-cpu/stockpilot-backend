@@ -574,6 +574,82 @@ export class InventoryService {
   }
 
   /**
+   * Delete a batch manually
+   */
+  async deleteBatch(batchId: string) {
+    try {
+      const { data: deletedBatch, error } = await this.supabase
+        .from('store_inventory_batches')
+        .delete()
+        .eq('id', batchId)
+        .maybeSingle();
+
+      if (error) throw new BadRequestException(error.message);
+      if (!deletedBatch) throw new NotFoundException('Batch not found');
+
+      return {
+        message: 'Batch deleted successfully',
+        batch: deletedBatch,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get all batches for a given variant
+   */
+  async getBatchesByVariant(variantId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('store_inventory_batches')
+        .select('*')
+        .eq('variant_id', variantId)
+        .order('expires_at', { ascending: true });
+
+      if (error) throw new BadRequestException(error.message);
+
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get inventory for a store
+   */
+  async getInventoryByStore(storeId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('store_inventory')
+        .select(
+          `
+          id,
+          store_id,
+          variant_id,
+          quantity,
+          low_stock_threshold,
+          reserved,
+          product_variants(
+            id,
+            name,
+            sku,
+            image_url,
+            products(name)
+          )
+        `,
+        )
+        .eq('store_id', storeId);
+
+      if (error) throw new BadRequestException(error.message);
+
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Helper: Update store inventory
    */
   private async updateStoreInventory(inventory: any, quantity: number) {

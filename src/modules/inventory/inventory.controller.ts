@@ -21,7 +21,7 @@ export class InventoryController {
    */
   @Post('restock')
   async restock(@Body() dto: RestockDto) {
-    return this.inventoryService.restockVariant(dto);
+    return this.inventoryService.restockVariants(dto);
   }
 
   /**
