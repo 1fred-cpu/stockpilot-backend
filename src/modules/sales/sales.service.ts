@@ -409,6 +409,9 @@ export class SalesService {
           payment_status: 'pending',
           payment_method: dto.payment_method || 'cash',
           created_by: dto.created_by,
+          customer_email: dto.customer?.email,
+          customer_phone: dto.customer?.phone,
+          customer_name: dto.customer?.name,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })

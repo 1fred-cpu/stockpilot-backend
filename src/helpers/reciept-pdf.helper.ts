@@ -14,9 +14,9 @@ export class ReceiptPdfService {
         doc.on('end', () => resolve(Buffer.concat(buffers)));
 
         // === HEADER WITH LOGO + BUSINESS INFO ===
-        if (business.logoUrl) {
+        if (business.logo_url) {
           try {
-            doc.image(business.logoUrl, 50, 45, { width: 60 });
+            doc.image(business.logo_url, 50, 45, { width: 60 });
           } catch (_) {
             // ignore broken logo
           }

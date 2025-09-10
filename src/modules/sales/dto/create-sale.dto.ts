@@ -31,4 +31,11 @@ export class CreateSaleDto {
 
   @IsOptional()
   idempotency_key?: string;
+
+  @IsOptional()
+  customer?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
 }
