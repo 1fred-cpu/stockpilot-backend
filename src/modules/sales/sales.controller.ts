@@ -17,7 +17,7 @@ import { UpdateSaleDto } from './dto/update-sale.dto';
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
-  @Post()
+  @Post("pos-sales")
   async createSale(@Body(ValidationPipe) createSaleDto: CreateSaleDto) {
     return this.salesService.createSale(createSaleDto);
   }

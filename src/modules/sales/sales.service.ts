@@ -426,7 +426,7 @@ export class SalesService {
                         business_id: dto.business_id,
                         total_amount: dto.total_amount,
                         net_amount: dto.total_amount,
-                        payment_status: "pending",
+                        payment_status: "paid",
                         payment_method: dto.payment_method || "cash",
                         created_by: dto.created_by,
                         customer_email: dto.customer?.email || null,
