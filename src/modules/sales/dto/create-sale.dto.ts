@@ -1,75 +1,34 @@
 import {
-    IsUUID,
-    IsString,
-    IsNumber,
-    IsOptional,
-    IsDateString,
-    Min,
-    IsObject,
-    IsEmail,
-    IsArray,
-    IsPhoneNumber,
-    IsNotEmpty,
-    ValidateNested
-} from "class-validator";
-import { Type } from "class-transformer";
-
-class Customer {
-    @IsString()
-    name: string;
-
-    @IsEmail()
-    email: string;
-
-    @IsPhoneNumber()
-    phoneNumber: string;
-}
-export class Sale {
-    @IsUUID()
-    productId: string;
-
-    @IsUUID()
-    variantId: string;
-
-    @IsNumber()
-    @Min(1)
-    quantity: number;
-
-    @IsNumber()
-    @Min(0)
-    pricePerUnit: number;
-
-    @IsNumber()
-    @Min(0)
-    totalPrice: number;
-
-    @IsUUID()
-    inventoryId: string;
-
-    @IsString()
-    idempotencyKey: string;
-
-    @IsString()
-    @IsNotEmpty()
-    type: string;
-
-    @IsString()
-    @IsNotEmpty()
-    status: string;
-
-    @IsObject()
-    customer: Customer;
-}
+  IsUUID,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { SaleItemDto } from './sale-item.dto';
 
 export class CreateSaleDto {
-    @IsUUID()
-    storeId: string;
+  @IsUUID()
+  store_id: string;
 
-    @IsDateString()
-    saleDate: string;
+  @IsUUID()
+  business_id: string;
 
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => Sale)
-    sales: Sale[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SaleItemDto)
+  items: SaleItemDto[];
+
+  @IsNumber()
+  total_amount: number;
+
+  @IsOptional()
+  payment_method?: string;
+
+  @IsOptional()
+  created_by?: string;
+
+  @IsOptional()
+  idempotency_key?: string;
 }

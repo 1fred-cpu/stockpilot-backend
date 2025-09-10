@@ -6,10 +6,12 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { CreateSaleDto } from './dto/create-sale.dto';
-import { UpdateSaleDto } from './dto/update-sale.dto';
-import { isValidUUID } from '../../utils/id-validator';
+import { v4 as uuidv4 } from 'uuid';
 import { InventoryService } from '../inventory/inventory.service';
+import { CreateSaleDto } from './dto/create-sale.dto';
+import { generateReference } from 'src/utils/generate-reference';
+import { HandleErrorService } from 'src/helpers/handle-error.helper';
+import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
 
 @Injectable()
 export class SalesService {
@@ -18,6 +20,8 @@ export class SalesService {
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: any,
     private readonly inventoryService: InventoryService,
+    private readonly errorHandler: HandleErrorService,
+    private readonly eventEmitterHelper: EventEmitterHelper,
   ) {}
 
   // async createSale(createSaleDto: CreateSaleDto) {
@@ -173,191 +177,379 @@ export class SalesService {
   //   }
   // }
 
-  async getSales(
-    storeId: string,
-    query: {
-      limit?: number;
-      page?: number;
-      startDate?: string;
-      endDate?: string;
-      search?: string;
-      orderBy?: string;
-      order?: 'asc' | 'desc';
-    },
-  ) {
+  // async getSales(
+  //   storeId: string,
+  //   query: {
+  //     limit?: number;
+  //     page?: number;
+  //     startDate?: string;
+  //     endDate?: string;
+  //     search?: string;
+  //     orderBy?: string;
+  //     order?: 'asc' | 'desc';
+  //   },
+  // ) {
+  //   try {
+  //     const limit = query.limit && query.limit > 0 ? query.limit : 10;
+  //     const page = query.page && query.page > 0 ? query.page : 1;
+  //     const from = (page - 1) * limit;
+  //     const to = from + limit - 1;
+
+  //     let supabaseQuery = this.supabase
+  //       .from('sales')
+  //       .select(
+  //         `
+  //         id,
+  //         saleDate,
+  //         quantity,
+  //         pricePerUnit,
+  //         totalPrice,
+  //         customer,
+  //         products (id, name, category),
+  //         variants (id, sku, color, size, weight, dimensions)
+  //       `,
+  //         { count: 'exact' },
+  //       )
+  //       .eq('storeId', storeId);
+
+  //     if (query.startDate) {
+  //       supabaseQuery = supabaseQuery.gte('saleDate', query.startDate);
+  //     }
+  //     if (query.endDate) {
+  //       supabaseQuery = supabaseQuery.lte('saleDate', query.endDate);
+  //     }
+  //     if (query.search) {
+  //       supabaseQuery = supabaseQuery.ilike('customer', `%${query.search}%`);
+  //     }
+  //     if (query.orderBy) {
+  //       supabaseQuery = supabaseQuery.order(query.orderBy, {
+  //         ascending: query.order === 'asc',
+  //       });
+  //     } else {
+  //       supabaseQuery = supabaseQuery.order('saleDate', {
+  //         ascending: false,
+  //       });
+  //     }
+
+  //     supabaseQuery = supabaseQuery.range(from, to);
+
+  //     const { data, error, count } = await supabaseQuery;
+
+  //     if (error) {
+  //       throw new BadRequestException(`Error fetching sales: ${error.message}`);
+  //     }
+
+  //     return {
+  //       data,
+  //       pagination: {
+  //         total: count,
+  //         page,
+  //         limit,
+  //         totalPages: Math.ceil((count || 0) / limit),
+  //       },
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Error in getSales: ${error.message}`);
+  //     if (error instanceof BadRequestException) throw error;
+  //     throw new InternalServerErrorException(
+  //       'An error occurred while fetching sales data',
+  //     );
+  //   }
+  // }
+
+  // async getAnalytics(storeId: string, startDate?: string, endDate?: string) {
+  //   try {
+  //     if (!storeId) {
+  //       throw new BadRequestException('storeId is required');
+  //     }
+
+  //     const dateRange = {
+  //       gte: startDate || '1900-01-01',
+  //       lte: endDate || new Date().toISOString(),
+  //     };
+
+  //     // 1. KPIs
+  //     const { data: salesData, error: salesError } = await this.supabase
+  //       .from('sales')
+  //       .select('totalPrice')
+  //       .eq('storeId', storeId)
+  //       .gte('saleDate', dateRange.gte)
+  //       .lte('saleDate', dateRange.lte);
+
+  //     if (salesError) throw new BadRequestException(salesError.message);
+
+  //     const totalSales = salesData.length;
+  //     const totalRevenue = salesData.reduce(
+  //       (sum, s) => sum + (s.totalPrice || 0),
+  //       0,
+  //     );
+  //     const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+  //     // 2. Sales over time
+  //     const { data: timelineData, error: timelineError } = await this.supabase
+  //       .from('sales')
+  //       .select('saleDate, totalPrice')
+  //       .eq('storeId', storeId)
+  //       .gte('saleDate', dateRange.gte)
+  //       .lte('saleDate', dateRange.lte)
+  //       .order('saleDate', { ascending: true });
+
+  //     if (timelineError) throw new BadRequestException(timelineError.message);
+
+  //     const salesByDate: Record<
+  //       string,
+  //       { totalSales: number; totalRevenue: number }
+  //     > = {};
+  //     timelineData.forEach((row) => {
+  //       const date = row.saleDate.split('T')[0];
+  //       if (!salesByDate[date]) {
+  //         salesByDate[date] = { totalSales: 0, totalRevenue: 0 };
+  //       }
+  //       salesByDate[date].totalSales += 1;
+  //       salesByDate[date].totalRevenue += row.totalPrice || 0;
+  //     });
+
+  //     // 3. Top products
+  //     const { data: topProductsData, error: topProductsError } =
+  //       await this.supabase
+  //         .from('sales')
+  //         .select(`productId, quantity, totalPrice, products(name)`)
+  //         .eq('storeId', storeId)
+  //         .gte('saleDate', dateRange.gte)
+  //         .lte('saleDate', dateRange.lte);
+
+  //     if (topProductsError)
+  //       throw new BadRequestException(topProductsError.message);
+
+  //     const productStats: Record<
+  //       string,
+  //       { name: string; unitsSold: number; totalRevenue: number }
+  //     > = {};
+  //     topProductsData.forEach((row) => {
+  //       const name = row.products?.name || 'Unknown Product';
+  //       if (!productStats[name]) {
+  //         productStats[name] = {
+  //           name,
+  //           unitsSold: 0,
+  //           totalRevenue: 0,
+  //         };
+  //       }
+  //       productStats[name].unitsSold += row.quantity || 0;
+  //       productStats[name].totalRevenue += row.totalPrice || 0;
+  //     });
+
+  //     const topProducts = Object.values(productStats)
+  //       .sort((a, b) => b.unitsSold - a.unitsSold)
+  //       .slice(0, 5);
+
+  //     return {
+  //       kpis: {
+  //         totalSales,
+  //         totalRevenue,
+  //         averageOrderValue: avgOrderValue,
+  //         topProduct: topProducts[0] || null,
+  //       },
+  //       salesOverTime: Object.entries(salesByDate).map(([date, stats]) => ({
+  //         date,
+  //         totalSales: stats.totalSales,
+  //         totalRevenue: stats.totalRevenue,
+  //       })),
+  //       topProducts,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Error in getAnalytics: ${error.message}`);
+  //     if (error instanceof BadRequestException) throw error;
+  //     throw new InternalServerErrorException(
+  //       'An error occurred while fetching sales analytics',
+  //     );
+  //   }
+  // }
+
+  /**
+   *
+   * @param dto
+   * @returns
+   */
+  async createSale(dto: CreateSaleDto) {
     try {
-      const limit = query.limit && query.limit > 0 ? query.limit : 10;
-      const page = query.page && query.page > 0 ? query.page : 1;
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      // Check if store exists
+      const store = await this.findStore(dto.store_id);
 
-      let supabaseQuery = this.supabase
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+
+      // 🔹 Check if already processed (idempotency)
+      const { data: existingLog, error: logError } = await this.supabase
+        .from('inventory_logs')
+        .select('*')
+        .eq('idempotency_key', dto.idempotency_key)
+        .maybeSingle();
+
+      if (logError) {
+        throw new BadRequestException(logError.message);
+      }
+
+      if (existingLog) {
+        return {
+          message: 'Duplicate request ignored (idempotent)',
+          idempotency_key: existingLog.idempotency_key,
+        };
+      }
+
+      // Insert sale data
+      const { data: sale, error } = await this.supabase
         .from('sales')
-        .select(
-          `
-          id,
-          saleDate,
-          quantity,
-          pricePerUnit,
-          totalPrice,
-          customer,
-          products (id, name, category),
-          variants (id, sku, color, size, weight, dimensions)
-        `,
-          { count: 'exact' },
-        )
-        .eq('storeId', storeId);
+        .insert({
+          id: uuidv4(),
+          store_id: dto.store_id,
+          business_id: dto.business_id,
+          total_amount: dto.total_amount,
+          net_amount: dto.total_amount,
+          payment_status: 'pending',
+          payment_method: dto.payment_method || 'cash',
+          created_by: dto.created_by,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .maybeSingle();
 
-      if (query.startDate) {
-        supabaseQuery = supabaseQuery.gte('saleDate', query.startDate);
-      }
-      if (query.endDate) {
-        supabaseQuery = supabaseQuery.lte('saleDate', query.endDate);
-      }
-      if (query.search) {
-        supabaseQuery = supabaseQuery.ilike('customer', `%${query.search}%`);
-      }
-      if (query.orderBy) {
-        supabaseQuery = supabaseQuery.order(query.orderBy, {
-          ascending: query.order === 'asc',
-        });
-      } else {
-        supabaseQuery = supabaseQuery.order('saleDate', {
-          ascending: false,
-        });
+      if (error) throw new BadRequestException(error.message);
+
+      const saleItems: any[] = [];
+      const deductions: any[] = [];
+
+      for (const item of dto.items) {
+        // Insert sale item
+        const { data, error } = await this.supabase
+          .from('sale_items')
+          .insert({
+            id: uuidv4(),
+            sale_id: sale.id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount: item.discount || 0,
+            total_price: item.unit_price * item.quantity - (item.discount || 0),
+          })
+          .select('*,product_variants(id,name,image_url,sku)')
+          .maybeSingle();
+
+        if (error) {
+          throw new BadRequestException(error.message);
+        }
+
+        if (data) {
+          saleItems.push(data);
+
+          deductions.push({
+            store_id: dto.store_id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            reason: 'sale',
+            reference: generateReference('SALE'),
+            created_by: dto.created_by,
+          });
+        }
       }
 
-      supabaseQuery = supabaseQuery.range(from, to);
+      // Deduct stock in inventory
+      await this.inventoryService.deductStock({
+        deductions,
+        idempotency_key: dto.idempotency_key || undefined,
+      });
 
-      const { data, error, count } = await supabaseQuery;
-
-      if (error) {
-        throw new BadRequestException(`Error fetching sales: ${error.message}`);
-      }
-
-      return {
-        data,
-        pagination: {
-          total: count,
-          page,
-          limit,
-          totalPages: Math.ceil((count || 0) / limit),
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Error in getSales: ${error.message}`);
-      if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(
-        'An error occurred while fetching sales data',
+      // Emit a SaleCreated event
+      await this.eventEmitterHelper.emitEvent(
+        'sales.events',
+        dto.store_id,
+        'SaleCreated',
+        { ...sale, items: saleItems },
       );
+
+      return { message: 'Sale created', sale_id: sale.id };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'createSale');
     }
   }
 
-  async getAnalytics(storeId: string, startDate?: string, endDate?: string) {
-    try {
-      if (!storeId) {
-        throw new BadRequestException('storeId is required');
-      }
+  /**
+   *
+   * @param saleId
+   * @param method
+   * @param amount
+   * @param reference
+   */
+  async recordPayment(
+    saleId: string,
+    method: string,
+    amount: number,
+    reference: string,
+  ) {
+    const { error } = await this.supabase.from('payments').insert({
+      id: uuidv4(),
+      sale_id: saleId,
+      method,
+      amount,
+      reference,
+      status: 'completed',
+      created_at: new Date().toISOString(),
+    });
 
-      const dateRange = {
-        gte: startDate || '1900-01-01',
-        lte: endDate || new Date().toISOString(),
-      };
+    if (error) throw new BadRequestException(error.message);
 
-      // 1. KPIs
-      const { data: salesData, error: salesError } = await this.supabase
-        .from('sales')
-        .select('totalPrice')
-        .eq('storeId', storeId)
-        .gte('saleDate', dateRange.gte)
-        .lte('saleDate', dateRange.lte);
+    await this.supabase
+      .from('sales')
+      .update({ payment_status: 'paid' })
+      .eq('id', saleId);
+  }
 
-      if (salesError) throw new BadRequestException(salesError.message);
+  /**
+   *
+   * @param saleId
+   * @param variantId
+   * @param quantity
+   * @param reason
+   * @param createdBy
+   */
+  async createRefund(
+    saleId: string,
+    variantId: string,
+    quantity: number,
+    reason: string,
+    createdBy: string,
+  ) {
+    const { error } = await this.supabase.from('refunds').insert({
+      id: crypto.randomUUID(),
+      sale_id: saleId,
+      variant_id: variantId,
+      quantity,
+      refund_amount: 0, // calculate later
+      reason,
+      created_by: createdBy,
+      created_at: new Date().toISOString(),
+    });
 
-      const totalSales = salesData.length;
-      const totalRevenue = salesData.reduce(
-        (sum, s) => sum + (s.totalPrice || 0),
-        0,
-      );
-      const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+    if (error) throw new BadRequestException(error.message);
+  }
 
-      // 2. Sales over time
-      const { data: timelineData, error: timelineError } = await this.supabase
-        .from('sales')
-        .select('saleDate, totalPrice')
-        .eq('storeId', storeId)
-        .gte('saleDate', dateRange.gte)
-        .lte('saleDate', dateRange.lte)
-        .order('saleDate', { ascending: true });
+  /**
+   *
+   * @param storeId
+   * @returns
+   */
+  private async findStore(storeId: string) {
+    const { data: store, error } = await this.supabase
+      .from('stores')
+      .select('*')
+      .eq('id', storeId)
+      .maybeSingle();
 
-      if (timelineError) throw new BadRequestException(timelineError.message);
-
-      const salesByDate: Record<
-        string,
-        { totalSales: number; totalRevenue: number }
-      > = {};
-      timelineData.forEach((row) => {
-        const date = row.saleDate.split('T')[0];
-        if (!salesByDate[date]) {
-          salesByDate[date] = { totalSales: 0, totalRevenue: 0 };
-        }
-        salesByDate[date].totalSales += 1;
-        salesByDate[date].totalRevenue += row.totalPrice || 0;
-      });
-
-      // 3. Top products
-      const { data: topProductsData, error: topProductsError } =
-        await this.supabase
-          .from('sales')
-          .select(`productId, quantity, totalPrice, products(name)`)
-          .eq('storeId', storeId)
-          .gte('saleDate', dateRange.gte)
-          .lte('saleDate', dateRange.lte);
-
-      if (topProductsError)
-        throw new BadRequestException(topProductsError.message);
-
-      const productStats: Record<
-        string,
-        { name: string; unitsSold: number; totalRevenue: number }
-      > = {};
-      topProductsData.forEach((row) => {
-        const name = row.products?.name || 'Unknown Product';
-        if (!productStats[name]) {
-          productStats[name] = {
-            name,
-            unitsSold: 0,
-            totalRevenue: 0,
-          };
-        }
-        productStats[name].unitsSold += row.quantity || 0;
-        productStats[name].totalRevenue += row.totalPrice || 0;
-      });
-
-      const topProducts = Object.values(productStats)
-        .sort((a, b) => b.unitsSold - a.unitsSold)
-        .slice(0, 5);
-
-      return {
-        kpis: {
-          totalSales,
-          totalRevenue,
-          averageOrderValue: avgOrderValue,
-          topProduct: topProducts[0] || null,
-        },
-        salesOverTime: Object.entries(salesByDate).map(([date, stats]) => ({
-          date,
-          totalSales: stats.totalSales,
-          totalRevenue: stats.totalRevenue,
-        })),
-        topProducts,
-      };
-    } catch (error) {
-      this.logger.error(`Error in getAnalytics: ${error.message}`);
-      if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(
-        'An error occurred while fetching sales analytics',
-      );
+    if (error) {
+      throw new BadRequestException(error.message);
     }
+
+    return store;
   }
 }

@@ -39,6 +39,7 @@
     "kafka": "^0.2.3",
     "kafkajs": "^2.2.4",
     "nodemailer": "^7.0.5",
+    "pdfkit": "^0.17.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "stripe": "^18.4.0",
