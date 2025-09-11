@@ -39,7 +39,7 @@ export class StoresController {
   @Post()
   async createStore(
     @Body(ValidationPipe) createStoreDto: CreateStoreDto,
-  ): Promise<Store | undefined> {
+  ) {
     return this.storesService.createStore(createStoreDto);
   }
 
@@ -84,7 +84,7 @@ export class StoresController {
   @Get(':storeId')
   async findStore(
     @Param('storeId', ParseUUIDPipe) storeId: string,
-  ): Promise<Store | undefined> {
+  ) {
     return this.storesService.findStore(storeId);
   }
 
@@ -99,7 +99,7 @@ export class StoresController {
   async findUserFromStore(
     @Param('storeId', ParseUUIDPipe) storeId: string,
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<User | undefined> {
+  ) {
     return this.storesService.getUserFromStore(storeId, userId);
   }
 
@@ -112,7 +112,7 @@ export class StoresController {
   @Get(':storeId/users')
   async findAllUsersFromStore(
     @Param('storeId', ParseUUIDPipe) storeId: string,
-  ): Promise<User[] | undefined> {
+  ) {
     return this.storesService.findAllUsersFromStore(storeId);
   }
 
@@ -125,7 +125,7 @@ export class StoresController {
   @Get('businesses/:businessId/users')
   async findAllUsersFromBusiness(
     @Param('businessId', ParseUUIDPipe) businessId: string,
-  ): Promise<User[] | undefined> {
+  ) {
     return this.storesService.findAllUsersFromBusiness(businessId);
   }
 
@@ -138,7 +138,7 @@ export class StoresController {
   @Get(':businessId/all')
   async findAllStores(
     @Param('businessId', ParseUUIDPipe) businessId: string,
-  ): Promise<Store[] | undefined> {
+  ) {
     return this.storesService.findAllStores(businessId);
   }
 
@@ -165,7 +165,7 @@ export class StoresController {
   async updateStore(
     @Param('storeId', ParseUUIDPipe) storeId: string,
     @Body(ValidationPipe) dto: UpdateStoreDto,
-  ): Promise<Store | undefined> {
+  ) {
     return this.storesService.updateStore(storeId, dto);
   }
 
@@ -195,7 +195,7 @@ export class StoresController {
   @Delete(':storeId')
   async deleteStore(
     @Param('storeId', ParseUUIDPipe) storeId: string,
-  ): Promise<Store | undefined> {
+  ) {
     return this.storesService.deleteStore(storeId);
   }
 

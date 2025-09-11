@@ -255,7 +255,7 @@ export class StoresService {
    * @param dto
    * @returns a created store data
    */
-  async createStore(dto: CreateStoreDto): Promise<Store | undefined> {
+  async createStore(dto: CreateStoreDto) {
     try {
       // Check if store with same name and business_id exists for the business
       if (
@@ -301,7 +301,7 @@ export class StoresService {
   }
 
   /**  FIND A STORE METHOD */
-  async findStore(storeId: string): Promise<Store | undefined> {
+  async findStore(storeId: string) {
     try {
       const store = await this.getStore(storeId);
       if (!store) {
@@ -319,7 +319,7 @@ export class StoresService {
    * @param businessId
    * @returns a empty array if not found or store data in an array
    */
-  async findAllStores(businessId: string): Promise<Store[] | undefined> {
+  async findAllStores(businessId: string) {
     try {
       const { data: stores, error: fetchError } = await this.supabase
         .from('stores')
@@ -350,7 +350,7 @@ export class StoresService {
   async updateStore(
     storeId: string,
     dto: UpdateStoreDto,
-  ): Promise<Store | undefined> {
+  ) {
     try {
       // returns a store , throws an error when not found
       await this.getStore(storeId);
@@ -379,7 +379,7 @@ export class StoresService {
    * @param storeId
    * @returns a deleted store data
    */
-  async deleteStore(storeId: string): Promise<Store | undefined> {
+  async deleteStore(storeId: string) {
     try {
       // returns a store or throws an error when not found
       await this.getStore(storeId);
@@ -606,7 +606,7 @@ export class StoresService {
   async getUserFromStore(
     storeId: string,
     userId: string,
-  ): Promise<User | undefined> {
+  ) {
     try {
       const { data, error } = await this.supabase
         .from('store_users')
@@ -661,7 +661,7 @@ export class StoresService {
    * @returns all users from a store
    */
 
-  async findAllUsersFromStore(storeId: string): Promise<User[] | undefined> {
+  async findAllUsersFromStore(storeId: string) {
     try {
       const { data, error } = await this.supabase
         .from('store_users')
@@ -716,7 +716,7 @@ export class StoresService {
 
   async findAllUsersFromBusiness(
     businessId: string,
-  ): Promise<User[] | undefined> {
+  ) {
     try {
       const { data, error } = await this.supabase
         .from('store_users')
@@ -981,7 +981,7 @@ export class StoresService {
    * @returns a store data or undefined
    */
   // Get a store
-  private async getStore(storeId: string): Promise<Store | undefined> {
+  private async getStore(storeId: string) {
     const { data: store, error: fetchError } = await this.supabase
       .from('stores')
       .select('*')

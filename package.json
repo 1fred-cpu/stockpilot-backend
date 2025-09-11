@@ -40,9 +40,11 @@
     "kafkajs": "^2.2.4",
     "nodemailer": "^7.0.5",
     "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "stripe": "^18.4.0",
+    "typeorm": "^0.3.26",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
