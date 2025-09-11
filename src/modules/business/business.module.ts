@@ -7,6 +7,7 @@ import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
 import { BusinessEventsListener } from 'src/event-listeners/business-events.listener';
 import { BillingModule } from '../billing/billing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { FileUploadService } from 'src/utils/upload-file';
 @Module({
   imports: [
     SupabaseModule,
@@ -20,6 +21,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     HandleErrorService,
     EventEmitterHelper,
     BusinessEventsListener,
+    FileUploadService,
   ],
 })
 export class BusinessModule {}
