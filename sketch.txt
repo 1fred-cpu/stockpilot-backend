@@ -1,0 +1,9 @@
+check if business exists
+throw an error if exists
+define a business payload
+define a store payload
+assigned a owner user as Admin role
+create a stripe customer for the business 
+update the stripe_customer_id in business payload
+insert business,store and store users in database
+return a message 

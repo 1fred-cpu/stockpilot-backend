@@ -9,35 +9,38 @@ import {
   Delete,
   Param,
   ParseUUIDPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { BusinessService } from './business.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Multer } from 'multer';
 
 @Controller('businesses')
 export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
-  /**
-   *
-   * @param dto
-   * @returns a business object
-   */
   @HttpCode(HttpStatus.CREATED)
   @Post('register')
-  async registerBusiness(@Body(ValidationPipe) dto: RegisterBusinessDto) {
-    return this.businessService.registerBusiness(dto);
+  @UseInterceptors(FileInterceptor('image_file'))
+  async registerBusiness(
+    @Body(ValidationPipe) dto: RegisterBusinessDto,
+    @UploadedFile('image_file') file?: Multer.File,
+  ) {
+    return this.businessService.registerBusiness(dto, file);
   }
 
-  /**
-   *
-   * @param businessId
-   * @returns a message
-   */
-  @HttpCode(HttpStatus.OK)
-  @Delete(':businessId')
-  async deleteBusiness(
-    @Param('businessId', ParseUUIDPipe) businessId: string,
-  ): Promise<{ message: string } | undefined> {
-    return this.businessService.deleteBusiness(businessId);
-  }
+  // /**
+  //  *
+  //  * @param businessId
+  //  * @returns a message
+  //  */
+  // @HttpCode(HttpStatus.OK)
+  // @Delete(':businessId')
+  // async deleteBusiness(
+  //   @Param('businessId', ParseUUIDPipe) businessId: string,
+  // ): Promise<{ message: string } | undefined> {
+  //   return this.businessService.deleteBusiness(businessId);
+  // }
 }
