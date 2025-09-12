@@ -7,3 +7,118 @@ create a stripe customer for the business
 update the stripe_customer_id in business payload
 insert business,store and store users in database
 return a message 
+
+
+
+🔑 Key Concepts in Your Setup
+
+User → Represents the actual person (auth, email, password, profile).
+
+Business → A company/account that owns stores.
+
+Store → A physical/digital store under a business.
+
+Relations:
+
+User → Business (many-to-one, user belongs to a business)
+
+User → Store (optional, e.g., store manager or staff)
+
+Business → Store (one-to-many)
+
+🛠️ Sign-up Workflow
+Step 1: User Registration
+
+What happens:
+
+User signs up with email + password (via Supabase Auth or your NestJS backend).
+
+At this point, they have no business and no store.
+
+Data saved:
+
+Insert into users table with:
+
+id (uuid, matches auth ID from Supabase or generated in your system)
+
+email, name
+
+business_id = NULL
+
+store_id = NULL
+
+status = "pending_setup" (to indicate they haven’t registered a business yet)
+
+UX flow:
+→ Redirect them to “Register Business” page.
+
+Step 2: Business Registration
+
+What happens:
+
+User fills in business details (name, type, country, etc.).
+
+A businesses record is created.
+
+Optionally, create a default store (e.g., “Main Store”) automatically.
+
+Data saved:
+
+Insert businesses row.
+
+Insert stores row (default or user-provided).
+
+Update users row:
+
+business_id = business.id
+
+store_id = default_store.id (or leave null if store isn’t required immediately)
+
+status = "active"
+
+UX flow:
+→ Redirect to Dashboard with their new business + store context.
+
+Step 3: Dashboard Access
+
+What happens:
+
+User is fully set up (business + store linked).
+
+They can invite other users (employees).
+
+Data:
+
+Normal business + store relations in place.
+
+UX flow:
+
+Show them analytics, products, etc.
+
+⚠️ Edge Case: User Signs In Without a Business
+
+This will definitely happen (if they registered but didn’t finish setup).
+
+When user logs in:
+
+Check if user.business_id IS NULL.
+
+If yes → redirect to Register Business.
+
+If they belong to a business but not a store, either:
+
+Assign them to the default store automatically, OR
+
+Redirect them to “Select/Create Store” page.
+
+🔄 Suggested Status/Flags for User
+
+To manage flows cleanly, I’d add a status column in users:
+
+pending_setup → signed up but no business.
+
+active → has business & store.
+
+invited → invited by another business but not activated yet.
+
+This way, you can branch logic on login.

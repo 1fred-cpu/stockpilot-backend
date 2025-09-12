@@ -339,7 +339,7 @@ export class BillingService {
       });
 
       // Skip if already has Stripe customer
-      if (business.stripe_customer_id) {
+      if (business?.stripe_customer_id) {
         this.logger.log(
           `Stripe customer already exists for business ${businessId}`,
         );
@@ -348,10 +348,10 @@ export class BillingService {
 
       // Create Stripe customer
       const customer = await this.stripe.customers.create({
-        email: business.email,
+        email: business?.email,
         metadata: {
           businessId,
-          email: business.email,
+          email: business?.email,
         },
       });
 

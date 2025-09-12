@@ -243,6 +243,12 @@ export class BusinessService {
         owner_user_id: dto.owner_user_id,
       });
 
+      if (existingBusiness) {
+        throw new ConflictException(
+          'A business already exists with this crendentials',
+        );
+      }
+
       // 2. Define business payload
       const now = new Date();
 
@@ -382,7 +388,7 @@ export class BusinessService {
     });
 
     if (!business) {
-      throw new NotFoundException('There is no registered business');
+      return null;
     }
 
     return business;
@@ -433,6 +439,7 @@ export class BusinessService {
         return { newBusiness, newStore, newStoreUser, newOwnerUser };
       });
     } catch (error) {
+      console.log(error);
       throw new HttpException(
         {
           success: false,

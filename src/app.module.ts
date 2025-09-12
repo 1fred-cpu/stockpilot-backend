@@ -20,6 +20,7 @@ import { BusinessModule } from './modules/business/business.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulesServiceModule } from './schedules/schedule.module';
+import { MigrationService } from './migration/migration.service';
 @Module({
   imports: [
     // Load environment variables from .env file
@@ -58,6 +59,7 @@ import { SchedulesServiceModule } from './schedules/schedule.module';
   ],
   controllers: [AppController],
   providers: [
+    MigrationService,
     AppService,
     {
       provide: APP_GUARD,
