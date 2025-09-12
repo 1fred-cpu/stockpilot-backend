@@ -60,6 +60,39 @@ export class FileUploadService {
         return pub.publicUrl;
     }
 
+    async deleteFolder(prefix: string, bucket: string) {
+        try {
+            // 1. List all files under the prefix
+            const { data, error: listError } = await this.supabase.storage
+                .from(bucket)
+                .list(prefix, { limit: 1000, recursive: true }); // recursive is important
+
+            if (listError) throw listError;
+
+            if (!data || data.length === 0) {
+                return { message: "No files found under this prefix" };
+            }
+
+            // 2. Build file paths to delete
+            const filePaths = data.map(file => `${prefix}/${file.name}`);
+
+            // 3. Delete them
+            const { error: deleteError } = await this.supabase.storage
+                .from(bucket)
+                .remove(filePaths);
+
+            if (deleteError) throw deleteError;
+
+            return {
+                message: `Deleted ${filePaths.length} files from ${prefix}`
+            };
+        } catch (err) {
+            throw new BadRequestException(
+                `Failed to delete folder ${prefix}: ${err.message}`
+            );
+        }
+    }
+
     async deleteFile(path: string, bucket: string) {
         try {
             const { error } = await this.supabase.storage

@@ -17,6 +17,7 @@ export class Business {
 
   @Column({ type: 'text' })
   name: string;
+  
 
   @Column({ type: 'uuid', unique: true })
   owner_user_id: string;

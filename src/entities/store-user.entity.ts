@@ -38,6 +38,9 @@ export class StoreUser {
 
   @Column({ type: 'timestamptz' })
   assigned_at: Date;
+  
+  @Column({ type: 'boolean' , default:false})
+  is_default: boolean;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
