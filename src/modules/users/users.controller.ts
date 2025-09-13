@@ -1,57 +1,35 @@
 import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Query,
-    Param,
-    Delete,
-    ValidationPipe
-} from "@nestjs/common";
-import { UsersService } from "./users.service";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { UpdateUserDto } from "./dto/update-user.dto";
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Query,
+  Param,
+  Delete,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
-@Controller("users")
+@Controller('users')
 export class UsersController {
-    constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) {}
 
-    @Post()
-    createUser(@Body() dto: CreateUserDto) {
-        return this.usersService.createUser(dto);
-    }
+  @Post()
+  async createUser(@Body() dto: CreateUserDto) {
+    return this.usersService.createUser(dto);
+  }
 
-    // @Get(":id")
-    // findUser(@Param("id") id: string, @Query("store_id") storeId?: string) {
-    //     return this.usersService.findUser(id, storeId);
-    // }
+  @Post('google')
+  async signupWithGoogle(@Body() dto: CreateUserDto) {
+    return this.usersService.signUpWithGoogle(dto);
+  }
 
-    // @Patch(":id")
-    // updateUser(
-    //     @Param("id") id: string,
-    //     @Body() updateUserDto: Partial<CreateUserDto>
-    // ) {
-    //     return this.usersService.updateUser(id, updateUserDto);
-    // }
-
-    // @Get()
-    // findAllUsers(
-    //     @Query("store_id") storeId?: string,
-    //     @Query("page") page?: number,
-    //     @Query("limit") limit?: number,
-    //     @Query("search") search?: string
-    // ) {
-    //     return this.usersService.findAllUsers({
-    //         storeId,
-    //         page: Number(page),
-    //         limit: Number(limit),
-    //         search
-    //     });
-    // }
-
-    // @Delete(":id")
-    // deleteUser(@Param("id") id: string) {
-    //     return this.usersService.deleteUser(id);
-    // }
+  @Delete(':id')
+  async deleteUser(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.deleteUser(id);
+  }
 }
