@@ -6,6 +6,8 @@ import { User } from "../../entities/user.entity";
 import { StoreUser } from "../../entities/store-user.entity";
 import { Store } from "../../entities/store.entity";
 import { HandleErrorService } from "../../helpers/handle-error.helper";
+import { UsersService } from "../users/users.service";
+import { v4 as uuidv4 } from "uuid";
 @Injectable()
 export class AuthService {
     constructor(
@@ -17,14 +19,15 @@ export class AuthService {
 
         @InjectRepository(Store)
         private readonly storeRepo: Repository<Store>,
-        private readonly errorHandler: HandleErrorService
+        private readonly errorHandler: HandleErrorService,
+        private readonly usersService: UsersService
     ) {}
 
-    async getUserWithStores(userId: string) {
+    async getUserWithStores(email: string) {
         try {
             // 1. Fetch user
             const user = await this.userRepo.findOne({
-                where: { id: userId },
+                where: { email },
                 select: [
                     "id",
                     "name",
@@ -82,7 +85,7 @@ export class AuthService {
             if (user.role === "Admin") {
                 // Admin → all stores under their business
                 const allStores = await this.storeRepo.find({
-                    where: { business: { id: user.business_id  as string} },
+                    where: { business: { id: user.business_id as string } },
                     relations: ["business"]
                 });
 
@@ -98,7 +101,7 @@ export class AuthService {
             } else {
                 // Normal user → only their stores
                 const storeUsers = await this.storeUserRepo.find({
-                    where: { user: { id: userId } },
+                    where: { user: { email } },
                     relations: ["store", "store.business"]
                 });
 
@@ -126,6 +129,99 @@ export class AuthService {
             };
         } catch (error) {
             this.errorHandler.handleServiceError(error, "getUserWithStores");
+        }
+    }
+
+    async signupUser(dto: { email: string; name: string}) {
+        try {
+            const user = this.usersService.createUser(dto);
+            return {
+                message: "Google account registered successfully",
+                nextStep: "register_business",
+                user
+            };
+        } catch (error) {
+            this.errorHandler.handleServiceError(
+                error,
+                "signupWithEmailAndPassword"
+            );
+        }
+    }
+    async signUpOrInWithGoogle(dto: { name: string; email: string }) {
+        try {
+            // 1. Find user by email
+            const existingUser = await this.usersService.findUser({
+                email: dto.email
+            });
+
+            if (existingUser) {
+                // Case A: User exists already with email/password
+                if (existingUser.auth_provider === "local") {
+                    // Update to allow Google login as well
+                    existingUser.auth_provider = "google"; // or "both"
+                    existingUser.updated_at = new Date();
+
+                    await this.userRepo.save(existingUser);
+
+                    // ✅ If user already has business + store → fetch enriched data
+                    if (existingUser.business_id && existingUser.store_id) {
+                        return this.getUserWithStores(existingUser.email);
+                    }
+
+                    const nextStep =
+                        !existingUser.business_id && !existingUser.store_id
+                            ? "register_business"
+                            : "dashboard";
+
+                    return {
+                        message: "Google account linked successfully",
+                        nextStep,
+                        user: existingUser
+                    };
+                }
+
+                // Case B: Already Google user → just log them in
+                if (existingUser.business_id && existingUser.store_id) {
+                    // ✅ Fetch enriched data
+                    return this.getUserWithStores(existingUser.email);
+                }
+
+                const nextStep =
+                    !existingUser.business_id && !existingUser.store_id
+                        ? "register_business"
+                        : "dashboard";
+
+                return {
+                    message: "User signed in with Google successfully",
+                    nextStep,
+                    user: existingUser
+                };
+            }
+
+            // 2. New Google user → create
+            const payload = {
+                id: uuidv4(),
+                name: dto.name,
+                email: dto.email,
+                store_id: null,
+                role: "Admin",
+                business_id: null,
+                status: "pending_setup",
+                auth_provider: "google", // track provider
+                created_at: new Date(),
+                updated_at: new Date()
+            };
+
+            const newUser =
+                await this.usersService.createUserWithTransaction(payload);
+
+            return {
+                message: "Google account registered successfully",
+                nextStep: "register_business",
+                user: newUser
+            };
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "signUpWithGoogle");
         }
     }
 }

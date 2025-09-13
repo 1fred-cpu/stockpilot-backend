@@ -62,71 +62,7 @@ export class UsersService {
     }
   }
 
-  async signUpWithGoogle(dto: CreateUserDto) {
-    try {
-      // 1. Find user by email
-      const existingUser = await this.findUser({ email: dto.email });
-
-      if (existingUser) {
-        // Case A: User exists already with email/password
-        if (existingUser.auth_provider === 'local') {
-          // Update to allow Google login as well
-          existingUser.auth_provider = 'google'; // or "both"
-          existingUser.updated_at = new Date();
-
-          await this.userRepo.save(existingUser);
-
-          const nextStep =
-            !existingUser.business_id && !existingUser.store_id
-              ? 'register_business'
-              : 'dashboard';
-
-          return {
-            message: 'Google account linked successfully',
-            nextStep,
-            user: existingUser,
-          };
-        }
-
-        // Case B: Already Google user → just log them in
-        const nextStep =
-          !existingUser.business_id && !existingUser.store_id
-            ? 'register_business'
-            : 'dashboard';
-
-        return {
-          message: 'User signed in with Google successfully',
-          nextStep,
-          user: existingUser,
-        };
-      }
-
-      // 2. New Google user → create
-      const payload = {
-        id: uuidv4(),
-        name: dto.name,
-        email: dto.email,
-        store_id: null,
-        role: 'Admin',
-        business_id: null,
-        status: 'pending_setup',
-        auth_provider: 'google', // track provider
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const newUser = await this.createUserWithTransaction(payload);
-
-      return {
-        message: 'Google account registered successfully',
-        nextStep: 'register_business',
-        user: newUser,
-      };
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'signUpWithGoogle');
-    }
-  }
-
+  
   /**
    * Find a single user by ID and optional store_id
    */
@@ -151,7 +87,7 @@ export class UsersService {
     }
   }
 
-  private async createUserWithTransaction(userData: any) {
+   async createUserWithTransaction(userData: any) {
     try {
       return await this.dataSource.transaction(async (manager) => {
         const data = await manager.create(User, userData);

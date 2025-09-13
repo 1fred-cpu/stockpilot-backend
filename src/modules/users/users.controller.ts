@@ -23,10 +23,7 @@ export class UsersController {
     return this.usersService.createUser(dto);
   }
 
-  @Post('google')
-  async signupWithGoogle(@Body() dto: CreateUserDto) {
-    return this.usersService.signUpWithGoogle(dto);
-  }
+
 
   @Delete(':id')
   async deleteUser(@Param('id', ParseUUIDPipe) id: string) {

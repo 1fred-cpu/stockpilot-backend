@@ -6,9 +6,9 @@ import { User } from "../../entities/user.entity";
 import { StoreUser } from "../../entities/store-user.entity";
 import { Store } from "../../entities/store.entity";
 import { HandleErrorService } from "../../helpers/handle-error.helper";
-
+import { UsersModule } from "../users/users.module";
 @Module({
-    imports: [TypeOrmModule.forFeature([User, StoreUser, Store])],
+    imports: [TypeOrmModule.forFeature([User, StoreUser, Store]), UsersModule],
     controllers: [AuthController],
     providers: [AuthService, HandleErrorService]
 })
