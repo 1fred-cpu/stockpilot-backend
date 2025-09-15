@@ -6,8 +6,23 @@ import { SupabaseModule } from "src/lib/supabase.module";
 import { FileUploadService } from "src/utils/upload-file";
 import { HandleErrorService } from "../../helpers/handle-error.helper";
 import { DiscountsModule } from "../discounts/discounts.module";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Product } from "../../entities/product.entity";
+import { ProductVariant } from "../../entities/product-variants.entity";
+import { Business } from "../../entities/business.entity";
+import { StoreInventory } from "../../entities/store-inventory.entity";
+
 @Module({
-    imports: [SupabaseModule, DiscountsModule],
+    imports: [
+        SupabaseModule,
+        DiscountsModule,
+        TypeOrmModule.forFeature([
+            Business,
+            StoreInventory,
+            ProductVariant,
+            Product
+        ])
+    ],
     controllers: [ProductsController],
     providers: [
         ProductsService,

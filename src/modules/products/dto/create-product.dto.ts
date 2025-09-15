@@ -32,6 +32,10 @@ export class CreateVariantDto {
 
     @IsNumber()
     @Min(0)
+    reserved: number;
+
+    @IsNumber()
+    @Min(0)
     low_stock_threshold: number;
 
     @IsOptional()
@@ -39,8 +43,7 @@ export class CreateVariantDto {
     image_url: string; // base64 string or file path, depending on frontend
 
     @IsOptional()
-    @IsString()
-    image_file: string;
+    image_file: Multer.File;
 
     @IsOptional()
     @IsArray()
@@ -54,6 +57,9 @@ export class CreateVariantDto {
 export class CreateProductDto {
     @IsUUID()
     business_id: string;
+
+    @IsString()
+    business_name: string;
 
     @IsUUID()
     store_id: string;

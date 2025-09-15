@@ -16,6 +16,12 @@ import { getPathFromUrl } from "src/utils/get-path";
 import { FileUploadService } from "src/utils/upload-file";
 import { Multer } from "multer";
 import { DiscountsService } from "../discounts/discounts.service";
+import { StoreInventory } from "../../entities/store-inventory.entity";
+import { Business } from "../../entities/business.entity";
+import { ProductVariant } from "../../entities/product-variants.entity";
+import { Product } from "../../entities/product.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
 
 @Injectable()
 export class ProductsService {
@@ -24,58 +30,17 @@ export class ProductsService {
         private readonly errorHandler: HandleErrorService,
         private readonly variantService: VariantsService,
         private readonly fileService: FileUploadService,
-        private readonly discountsService: DiscountsService
+        private readonly discountsService: DiscountsService,
+        @InjectRepository(Product)
+        private readonly productRepo: Repository<Product>,
+        @InjectRepository(ProductVariant)
+        private readonly variantRepo: Repository<ProductVariant>,
+        @InjectRepository(Business)
+        private readonly businessRepo: Repository<Business>,
+        @InjectRepository(StoreInventory)
+        private readonly inventoryRepo: Repository<StoreInventory>,
+        private readonly dataSource: DataSource
     ) {}
-
-    /**
-     *
-     * @param businessId
-     * @param dto
-     * @returns a product object
-     */
-    private async createProduct(
-        businessId: string,
-        dto: CreateProductDto
-    ) {
-        try {
-            // Upload thumbnail file and get url
-
-            const path = `variants/${businessId}/${Date.now()}_${
-                dto.thumbnail.originalname
-            }`;
-            const thumbnailUrl = await this.fileService.uploadFile(
-                dto.thumbnail,
-                path,
-                "products"
-            );
-            const categoryId = await this.handleCategory(dto);
-
-            const id = uuidv4();
-            const payload = {
-                id,
-                business_id: businessId,
-                name: dto.name,
-                description: dto.description ?? null,
-                category: dto.category ?? null,
-                brand: dto.brand ?? null,
-                thumbnail: thumbnailUrl,
-                categoryId,
-                tags: dto.tags ?? [],
-                slug: generateSlug(dto.name),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
-            const { error } = await this.supabase
-                .from("products")
-                .insert([payload]);
-            if (error) throw new BadRequestException(error.message);
-
-            return payload;
-        } catch (error) {
-            this.errorHandler.handleServiceError(error, "createProduct");
-        }
-    }
 
     /**
      *
@@ -119,27 +84,36 @@ export class ProductsService {
      */
     async findAllProductsByBusiness(businessId: string) {
         try {
-            const { data, error } = await this.supabase
-                .from("products")
-                .select(
-                    `
-        *,
-        product_variants (
-          id,
-          name,
-          sku,
-          price,
-          image_url,
-          store_id,
-          store_inventory(*),
-          store_inventory_batches(*)
-        )
-        `
-                )
-                .eq("business_id", businessId);
-
-            if (error) throw new BadRequestException(error.message);
-            if (!data || data.length === 0) return [];
+            const data = await this.productRepo.find({
+                where: {
+                    business_id: businessId
+                },
+                relations: {
+                    product_variants: {
+                        store_inventories: true
+                        //                 store_inventory_batches: true
+                    }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    // 👇 select only fields you need
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                        //                        store_inventory_batches: true
+                    }
+                }
+            });
+            if (data.length === 0) {
+                return [];
+            }
 
             const products = data.map(p => ({
                 id: p.id,
@@ -148,9 +122,9 @@ export class ProductsService {
                 description: p.description,
                 category: p.category,
                 brand: p.brand,
-                track_batches: p.track_batches,
+                //              track_batches: p.track_batches,
                 tags: p.tags,
-                thumbnail_url: p.thumbnail_url,
+                thumbnail: p.thumbnail,
                 created_at: p.created_at,
                 updated_at: p.updated_at,
                 product_variants: p.product_variants || []
@@ -168,28 +142,33 @@ export class ProductsService {
      */
     async findProduct(productId: string, storeId: string) {
         try {
-            const { data, error } = await this.supabase
-                .from("products")
-                .select(
-                    `
-        *,
-        product_variants (
-          id,
-          name,
-          sku,
-          price,
-          image_url,
-          store_id,
-          store_inventory(*),
-          store_inventory_batches(*)
-        )
-        `
-                )
-                .eq("id", productId)
-                .eq("product_variants.store_id", storeId) // filter variants for the given store
-                .maybeSingle();
-
-            if (error) throw new BadRequestException(error.message);
+            const data = await this.productRepo.findOne({
+                where: {
+                    id: productId
+                },
+                relations: {
+                    product_variants: {
+                        store_inventories: true
+                        //                 store_inventory_batches: true
+                    }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    // 👇 select only fields you need
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                        //                        store_inventory_batches: true
+                    }
+                }
+            });
             if (!data) throw new NotFoundException("Product not found");
 
             const product = {
@@ -199,9 +178,9 @@ export class ProductsService {
                 description: data.description,
                 category: data.category,
                 brand: data.brand,
-                track_batches: data.track_batches,
+                //track_batches: data.track_batches,
                 tags: data.tags,
-                thumbnail_url: data.thumbnail_url,
+                thumbnail: data.thumbnail,
                 created_at: data.created_at,
                 updated_at: data.updated_at,
                 product_variants: data.product_variants || []
@@ -220,38 +199,48 @@ export class ProductsService {
      */
     async findAllProductsByStore(storeId: string) {
         try {
-            const { data, error } = await this.supabase
-                .from("products")
-                .select(
-                    `
-        *,
-        product_variants (
-          id,
-          name,
-          sku,
-          price,
-          image_url,
-          store_id,
-          store_inventory(*),
-          store_inventory_batches(*)
-        )
-        `
-                )
-                .eq("product_variants.store_id", storeId);
+            const data = await this.productRepo.find({
+                where: {
+                    product_variants: {
+                        store_id: storeId // filter inside variants
+                    }
+                },
+                relations: {
+                    product_variants: {
+                        store_inventories: true
+                        //                 store_inventory_batches: true
+                    }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    // 👇 select only fields you need
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                        //                        store_inventory_batches: true
+                    }
+                }
+            });
+            if (data.length === 0) {
+                return [];
+            }
 
-            if (error) throw new BadRequestException(error.message);
-
-            // Restructure into { product: { ... , product_variants: [...] } }
             const products = (data || []).map(p => ({
                 id: p.id,
                 business_id: p.business_id,
                 name: p.name,
                 description: p.description,
-                category: p.category,
+                category: p.category_type,
                 brand: p.brand,
-                track_batches: p.track_batches,
                 tags: p.tags,
-                thumbnail_url: p.thumbnail_url,
+                thumbnail: p.thumbnail,
                 created_at: p.created_at,
                 updated_at: p.updated_at,
                 product_variants: p.product_variants || []
@@ -269,64 +258,152 @@ export class ProductsService {
      * @returns
      */
     async createProductWithVariants(businessId: string, dto: CreateProductDto) {
+        const now = new Date();
+        const uploadedImageUrls: string[] = [];
+
         try {
-            // Check if product already exists
-            if (await this.doProductExists(dto.name, businessId)) {
+            // 1. Check business exists
+            const business = await this.businessRepo.findOne({
+                where: { id: businessId }
+            });
+            if (!business) {
+                throw new NotFoundException(
+                    "Cannot find a business with this business ID"
+                );
+            }
+
+            // 2. Check if product already exists
+            const existingProduct = await this.productRepo.findOne({
+                where: { name: dto.name }
+            });
+            if (existingProduct) {
                 throw new ConflictException(
-                    "Product with this name already exists"
+                    "A product already exists with this credentials"
                 );
             }
-            // 1. Create product
-            const product = await this.createProduct(businessId, dto);
-
-            const createdVariants: any[] = [];
-
-            // 2. Handle variants
+            // 3. Check if variants provided exists
             for (const variant of dto.variants) {
-                // 2a. insert variant
-                const newVariant = await this.variantService.createVariant(
-                    businessId,
-                    dto.store_id,
-                    product?.id as string,
-                    variant,
-                    variant.image_file
-                );
-
-                // 2b. Create inventory row
-                await this.supabase.from("store_inventory").insert({
-                    store_id: dto.store_id,
-                    business_id: businessId,
-                    variant_id: newVariant?.id,
-                    quantity: variant.quantity,
-                    low_stock_threshold: variant.low_stock_threshold
+                const existsingVariant = await this.variantRepo.findOne({
+                    where: { sku: variant.sku }
                 });
-
-                if (dto.track_batches) {
-                    // 2d. Create batch row
-                    await this.supabase.from("store_inventory_batches").insert({
-                        store_id: dto.store_id,
-                        business_id: businessId,
-                        variant_id: newVariant?.id,
-                        batch_number: `BATCH-${Date.now()}`,
-                        quantity: variant.quantity,
-                        received_at: new Date(),
-                        expiry_date: variant.expiry_date ?? null
-                    });
+                if (existsingVariant) {
+                    throw new ConflictException(`Variant with sku ${variant.sku}
+                  already exists`);
                 }
-
-                createdVariants.push(newVariant);
             }
 
-            return {
-                product,
-                variants: createdVariants,
-                message: "Product and variants created successfully"
+            // 4. Prepare product payload
+            const categoryId = await this.handleCategory(dto);
+            const path = `businesses/${dto.business_name}/${uuidv4()}_${
+                dto.thumbnail.originalname
+            }`;
+            const thumbnailUrl = await this.fileService.uploadFile(
+                dto.thumbnail,
+                path,
+                "products"
+            );
+            uploadedImageUrls.push(thumbnailUrl);
+            const productData = {
+                id: uuidv4(),
+                business_id: businessId,
+                description: dto.description,
+                name: dto.name,
+                tags: dto.tags || [],
+                brand: dto.brand,
+                slug: generateSlug(dto.name),
+                thumbnail: thumbnailUrl,
+                category_id: categoryId,
+                category_type: dto.category,
+                created_at: now,
+                updated_at: now
             };
+
+            // 5. Upload images + prepare variants
+            const variantsData = await Promise.all(
+                dto.variants.map(async variant => {
+                    const path = `business/${dto.business_name}/${uuidv4()}_${
+                        variant.image_file.originalname
+                    }`;
+                    const imageUrl = await this.fileService.uploadFile(
+                        variant.image_file,
+                        path,
+                        "products"
+                    );
+                    uploadedImageUrls.push(imageUrl);
+
+                    return {
+                        id: uuidv4(),
+                        product_id: productData.id,
+                        name: variant.name,
+                        sku: variant.sku,
+                        price: variant.price,
+                        image_url: imageUrl,
+                        store_id: dto.store_id,
+                        attributes: variant.attributes || [],
+                        business_id: businessId,
+                        created_at: now,
+                        updated_at: now
+                    };
+                })
+            );
+
+            // 6. Inventories
+            const variantInventories = variantsData.map((variant, index) => ({
+                id: uuidv4(),
+                business_id: businessId,
+                store_id: dto.store_id,
+                variant_id: variant.id,
+                quantity: dto.variants[index].quantity,
+                reserved: dto.variants[index].reserved,
+                low_stock_threshold: dto.variants[index].low_stock_threshold,
+                created_at: now,
+                updated_at: now
+            }));
+
+            // 7. Transaction (product + variants + inventories)
+            return await this.dataSource.transaction(async manager => {
+                // Insert product
+                const product = manager.create(Product, productData);
+                const newProduct = await manager.save(Product, product);
+
+                // Insert variants
+                const variantEntities = manager.create(
+                    ProductVariant,
+                    variantsData
+                );
+                const newVariants = await manager.save(
+                    ProductVariant,
+                    variantEntities
+                );
+
+                // Insert inventories
+                const inventoryEntities = manager.create(
+                    StoreInventory,
+                    variantInventories
+                );
+                await manager.save(StoreInventory, inventoryEntities);
+
+                return { product: newProduct, variants: newVariants };
+            });
         } catch (error) {
+            // Cleanup uploaded files if something failed
+            if (uploadedImageUrls.length > 0) {
+                for (const url of uploadedImageUrls) {
+                    try {
+                        const path = getPathFromUrl(url);
+                        await this.fileService.deleteFile(path, "products");
+                    } catch (cleanupErr) {
+                        console.error("Failed to cleanup file:", cleanupErr);
+                    }
+                }
+            }
+
+            // Re-throw handled error
             this.errorHandler.handleServiceError(
                 error,
                 "createProductWithVariants"
             );
+            throw error;
         }
     }
 

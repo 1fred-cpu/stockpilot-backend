@@ -68,7 +68,6 @@ export class ProductsController {
                 variants: variantsWithImages,
                 thumbnail: files.thumbnail?.[0] ?? null
             };
-            console.log(productPayload);
 
             // ✅ Call service
             return this.productsService.createProductWithVariants(
