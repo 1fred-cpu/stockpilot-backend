@@ -43,8 +43,7 @@ export class RegisterBusinessDto {
 
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  website: string;
+  website?: string;
 
   @IsOptional()
   image_file: Multer.File;

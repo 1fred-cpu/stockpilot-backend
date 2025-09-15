@@ -11,6 +11,7 @@ import {
 import { Store } from './store.entity';
 import { Business } from './business.entity';
 import { StoreUser } from './store-user.entity';
+import { Sale } from './sale.entity';
 
 @Entity('users')
 export class User {
@@ -59,4 +60,8 @@ export class User {
   // 👇 Relation: one user can appear in many store_users (assignments)
   @OneToMany(() => StoreUser, (storeUser) => storeUser.user)
   storeUsers: StoreUser[];
+
+  // 👇 Relation: one user can create multiple sales
+  @OneToMany(() => Sale, (sale) => sale.user)
+  sales: Sale[];
 }

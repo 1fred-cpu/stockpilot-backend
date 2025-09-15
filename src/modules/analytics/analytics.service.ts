@@ -1,671 +1,494 @@
 import {
-    Injectable,
-    Inject,
-    Logger,
-    InternalServerErrorException,
-    NotFoundException,
-    BadRequestException
-} from "@nestjs/common";
-import { isValidUUID } from "../../utils/id-validator";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { v4 as uuid } from "uuid";
-import { HandleErrorService } from "../../helpers/handle-error.helper";
+  Injectable,
+  Inject,
+  Logger,
+  InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { isValidUUID } from '../../utils/id-validator';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { v4 as uuid } from 'uuid';
+import { HandleErrorService } from '../../helpers/handle-error.helper';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Store } from 'src/entities/store.entity';
+import { Between, LessThanOrEqual, Repository } from 'typeorm';
+import { Sale } from 'src/entities/sale.entity';
+import { Product } from 'src/entities/product.entity';
+import { StoreInventory } from 'src/entities/store-inventory.entity';
+import { Customer } from 'src/entities/customer.entity';
+import { SaleItem } from 'src/entities/sale-item.entity';
 
 @Injectable()
 export class AnalyticsService {
-    private logger = new Logger(AnalyticsService.name);
-    constructor(
-        @Inject("SUPABASE_CLIENT") private readonly supabase: any,
-        private readonly errorHandler: HandleErrorService
-    ) {}
+  private logger = new Logger(AnalyticsService.name);
+  constructor(
+    @Inject('SUPABASE_CLIENT') private readonly supabase: any,
+    private readonly errorHandler: HandleErrorService,
+    @InjectRepository(Store) private readonly storeRepo: Repository<Store>,
+    @InjectRepository(Sale) private readonly saleRepo: Repository<Sale>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+    @InjectRepository(StoreInventory)
+    private readonly inventoryRepo: Repository<StoreInventory>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
+    @InjectRepository(SaleItem)
+    private readonly saleItemRepo: Repository<SaleItem>,
+  ) {}
 
-    async getKPIAnalytics(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid storeId format");
-            }
+  async getKPIAnalytics(storeId: string) {
+    try {
+      // 1. Check if store exist
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
+      console.log(store);
 
-            // Check if storeId exist with a store
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("id")
-                .eq("id", storeId)
-                .maybeSingle();
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    "Error fetching store",
-                    fetchError
-                );
-            }
+      const now = new Date();
+      const currentMonthStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+      ).toISOString();
+      const lastMonthStart = new Date(
+        now.getFullYear(),
+        now.getMonth() - 1,
+        1,
+      ).toISOString();
+      const lastMonthEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        0,
+      ).toISOString();
 
-            if (!store) {
-                throw new NotFoundException(
-                    "storeId does not exists with a store"
-                );
-            }
-            const now = new Date();
-            const currentMonthStart = new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                1
-            ).toISOString();
-            const lastMonthStart = new Date(
-                now.getFullYear(),
-                now.getMonth() - 1,
-                1
-            ).toISOString();
-            const lastMonthEnd = new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                0
-            ).toISOString();
+      /** ---------------- SALES ---------------- */
+      // Current Month Sales
 
-            /** ---------------- SALES ---------------- */
-            // Current Month Sales
-            const { data: currentSales, error: currentSalesErr } =
-                await this.supabase
-                    .from("sales")
-                    .select("totalPrice")
-                    .eq("storeId", storeId)
-                    .gte("createdAt", currentMonthStart)
-                    .lte("createdAt", now.toISOString());
+      const currentSales = await this.saleRepo.find({
+        select: ['total_amount'], // only fetch totalPrice
+        where: {
+          id: storeId,
+          created_at: Between(new Date(currentMonthStart), now),
+        },
+      });
+      console.log('step1');
 
-            if (currentSalesErr) {
-                throw currentSalesErr;
-            }
+      const totalSalesCurrentMonth = (currentSales || []).reduce(
+        (sum, s) => sum + (s.total_amount || 0),
+        0,
+      );
+      console.log('step2');
 
-            const totalSalesCurrentMonth = (currentSales || []).reduce(
-                (sum, s) => sum + (s.totalPrice || 0),
-                0
-            );
+      // Last Month Sales
 
-            // Last Month Sales
-            const { data: lastSales, error: lastSalesErr } = await this.supabase
-                .from("sales")
-                .select("totalPrice")
-                .eq("storeId", storeId)
-                .gte("createdAt", lastMonthStart)
-                .lte("createdAt", lastMonthEnd);
+      const lastSales = await this.saleRepo.find({
+        select: ['total_amount'], // only fetch totalPrice
+        where: {
+          id: storeId,
+          created_at: Between(new Date(lastMonthStart), new Date(lastMonthEnd)),
+        },
+      });
+      console.log('step3');
 
-            if (lastSalesErr) throw lastSalesErr;
+      const totalSalesLastMonth = (lastSales || []).reduce(
+        (sum, s) => sum + (s.total_amount || 0),
+        0,
+      );
+      console.log('step4');
 
-            const totalSalesLastMonth = (lastSales || []).reduce(
-                (sum, s) => sum + (s.total_amount || 0),
-                0
-            );
+      // % Change
+      let percentageChange = 0;
+      if (totalSalesLastMonth > 0) {
+        percentageChange =
+          ((totalSalesCurrentMonth - totalSalesLastMonth) /
+            totalSalesLastMonth) *
+          100;
+      }
 
-            // % Change
-            let percentageChange = 0;
-            if (totalSalesLastMonth > 0) {
-                percentageChange =
-                    ((totalSalesCurrentMonth - totalSalesLastMonth) /
-                        totalSalesLastMonth) *
-                    100;
-            }
+      /** ---------------- PRODUCTS ---------------- */
+      const totalProducts = await this.productRepo.count({
+        where: { business_id: store.business_id },
+      });
+      console.log('step5');
 
-            /** ---------------- PRODUCTS ---------------- */
-            const { count: totalProducts, error: productErr } =
-                await this.supabase
-                    .from("products")
-                    .select("*", { count: "exact", head: true })
-                    .eq("storeId", storeId);
+      /** Current Month Products */
 
-            if (productErr) throw productErr;
+      const totalProductsCurrentMonth = await this.productRepo.count({
+        where: {
+          business_id: store.business_id,
+          created_at: Between(new Date(currentMonthStart), now),
+        },
+      });
+      console.log('step6');
 
-            /** Current Month Products */
-            const {
-                count: totalProductsCurrentMonth,
-                error: currentMonthProductErr
-            } = await this.supabase
-                .from("products")
-                .select("*", { count: "exact", head: true })
-                .eq("storeId", storeId)
-                .gte("createdAt", currentMonthStart)
-                .lte("createdAt", now.toISOString());
+      /** Last Month Products */
+      const totalProductsLastMonth = await this.productRepo.count({
+        where: {
+          business_id: store.business_id,
+          created_at: Between(new Date(lastMonthStart), new Date(lastMonthEnd)),
+        },
+      });
+      console.log(`lastProductsCurrentMonth: ${totalProducts}`);
 
-            if (currentMonthProductErr) throw currentMonthProductErr;
+      /** %Change */
+      let percentageChangeProducts = 0;
 
-            /** Last Month Products */
-            const { data: totalProductsLastMonth, error: lastMonthProductErr } =
-                await this.supabase
-                    .from("products")
-                    .select("*", { count: "exact", head: true })
-                    .eq("storeId", storeId)
-                    .gte("createdAt", lastMonthStart)
-                    .lte("createdAt", lastMonthEnd);
+      if (totalProductsLastMonth > 0) {
+        percentageChangeProducts =
+          ((totalProductsCurrentMonth - totalProductsLastMonth) /
+            totalProductsLastMonth) *
+          100;
+      }
 
-            if (lastMonthProductErr) throw lastMonthProductErr;
+      // Low Stock Products (threshold = 5 units, or use column if available)
+      const lowStockProducts = await this.inventoryRepo.count({
+        where: {
+          store_id: storeId,
+          quantity: LessThanOrEqual(5),
+        },
+      });
 
-            /** %Change */
-            let percentageChangeProducts = 0;
+      /** ---------------- CUSTOMERS ---------------- */
+      const currentMonthCustomers = await this.customerRepo.count({
+        where: {
+          store_id: storeId,
+          created_at: Between(new Date(currentMonthStart), now),
+        },
+      });
 
-            if (totalProductsLastMonth > 0) {
-                percentageChangeProducts =
-                    ((totalProductsCurrentMonth - totalProductsLastMonth) /
-                        totalProductsLastMonth) *
-                    100;
-            }
+      const lastMonthCustomers = await this.customerRepo.count({
+        where: {
+          store_id: storeId,
+          created_at: Between(new Date(lastMonthStart), new Date(lastMonthEnd)),
+        },
+      });
 
-            // Low Stock Products (threshold = 5 units, or use column if available)
-            const { count: lowStockProducts, error: lowStockErr } =
-                await this.supabase
-                    .from("inventories")
-                    .select("*", { count: "exact", head: true })
-                    .eq("storeId", storeId)
-                    .lte("stock", 5);
+      /** % change */
 
-            if (lowStockErr) throw lowStockErr;
+      let percentageChangeCustomers = 0;
+      if (lastMonthCustomers > 0) {
+        percentageChangeCustomers =
+          ((currentMonthCustomers - lastMonthCustomers) / lastMonthCustomers) *
+          100;
+      }
 
-            /** ---------------- CUSTOMERS ---------------- */
-            const {
-                count: currentMonthCustomers,
-                error: currentMonthCustomerErr
-            } = await this.supabase
-                .from("customers")
-                .select("*", { count: "exact", head: true })
-                .eq("storeId", storeId)
-                .gte("createdAt", currentMonthStart)
-                .lte("createdAt", now.toISOString());
-
-            if (currentMonthCustomerErr) throw currentMonthCustomerErr;
-
-            const { count: lastMonthCustomers, error: lastMonthCustomerErr } =
-                await this.supabase
-                    .from("customers")
-                    .select("*", { count: "exact", head: true })
-                    .eq("storeId", storeId)
-                    .gte("createdAt", lastMonthStart)
-                    .lte("createdAt", lastMonthEnd);
-
-            if (lastMonthCustomerErr) throw lastMonthCustomerErr;
-
-            /** % change */
-
-            let percentageChangeCustomers = 0;
-            if (lastMonthCustomers > 0) {
-                percentageChangeCustomers =
-                    ((currentMonthCustomers - lastMonthCustomers) /
-                        lastMonthCustomers) *
-                    100;
-            }
-
-            return {
-                sales: {
-                    currentMonth: totalSalesCurrentMonth,
-                    lastMonth: totalSalesLastMonth,
-                    percentageChange: percentageChange.toFixed(2)
-                },
-                products: {
-                    total: totalProducts || 0,
-                    lowStock: lowStockProducts || 0,
-                    percentageChange: percentageChangeProducts.toFixed(2)
-                },
-                customers: {
-                    new: currentMonthCustomers || 0,
-                    percentageChange: percentageChangeCustomers.toFixed(2)
-                }
-            };
-        } catch (error) {
-            if (error instanceof NotFoundException || BadRequestException) {
-                throw error;
-            }
-            this.logger.error("Error fetching KPI analytics", error);
-            throw new InternalServerErrorException(
-                "Failed to fetch KPI analytics"
-            );
-        }
+      return {
+        sales: {
+          currentMonth: totalSalesCurrentMonth,
+          lastMonth: totalSalesLastMonth,
+          percentageChange: percentageChange.toFixed(2),
+        },
+        products: {
+          total: totalProducts || 0,
+          lowStock: lowStockProducts || 0,
+          percentageChange: percentageChangeProducts.toFixed(2),
+        },
+        customers: {
+          new: currentMonthCustomers || 0,
+          percentageChange: percentageChangeCustomers.toFixed(2),
+        },
+      };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getKPIAnalytics');
     }
+  }
 
-    async getSalesTrendLast30days(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid storeId format");
-            }
-            // Check if storeId exist with a store
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("id")
-                .eq("id", storeId)
-                .maybeSingle();
+  async getSalesTrendLast30days(storeId: string) {
+    try {
+      // Check if storeId exist with a store
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    "Error fetching store",
-                    fetchError
-                );
-            }
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            if (!store) {
-                throw new NotFoundException(
-                    "storeId does not exists with a store"
-                );
-            }
+      const today = new Date();
+      const startDate = new Date();
+      startDate.setDate(today.getDate() - 30);
 
-            const today = new Date();
-            const startDate = new Date();
-            startDate.setDate(today.getDate() - 30);
+      // Query sales from Supabase
+      const data = await this.saleRepo.find({
+        where: { store_id: storeId, created_at: Between(startDate, today) },
+        select: ['total_amount', 'created_at'],
+      });
 
-            // Query sales from Supabase
-            const { data, error } = await this.supabase
-                .from("sales")
-                .select("totalPrice, createdAt")
-                .eq("storeId", storeId)
-                .gte("createdAt", startDate.toISOString())
-                .lte("createdAt", today.toISOString());
+      // Group sales by date
+      const salesByDate: Record<string, number> = {};
 
-            if (error) throw new BadRequestException(error.message);
+      for (const row of data) {
+        const date = new Date(row.created_at).toISOString().split('T')[0]; // YYYY-MM-DD
+        salesByDate[date] = (salesByDate[date] || 0) + row.total_amount;
+      }
 
-            // Group sales by date
-            const salesByDate: Record<string, number> = {};
+      // Ensure all last 30 days are included (even if sales = 0)
+      const result: { date: string; sales: number }[] = [];
+      for (let i = 0; i <= 30; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        result.push({
+          date: dateStr,
+          sales: salesByDate[dateStr] || 0,
+        });
+      }
 
-            for (const row of data) {
-                const date = new Date(row.createdAt)
-                    .toISOString()
-                    .split("T")[0]; // YYYY-MM-DD
-                salesByDate[date] = (salesByDate[date] || 0) + row.totalPrice;
-            }
-
-            // Ensure all last 30 days are included (even if sales = 0)
-            const result: { date: string; sales: number }[] = [];
-            for (let i = 0; i <= 30; i++) {
-                const d = new Date(startDate);
-                d.setDate(startDate.getDate() + i);
-                const dateStr = d.toISOString().split("T")[0];
-                result.push({
-                    date: dateStr,
-                    sales: salesByDate[dateStr] || 0
-                });
-            }
-
-            return result;
-        } catch (error) {
-            if (error instanceof BadRequestException || NotFoundException) {
-                throw error;
-            }
-            this.logger.error(
-                `Error fetching Sales Trend Last 30 days analytics: ${error}`
-            );
-            throw new InternalServerErrorException(
-                "Failed to fetch Sales Trend Last 30 days analytics"
-            );
-        }
+      return result;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getSalesTrendLast30Days');
     }
+  }
 
-    async getTopSellingProducts(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid storeId format");
-            }
+  async getTopSellingProducts(storeId: string) {
+    try {
+      // Check if storeId exist with a store
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
 
-            // Check if storeId exist with a store
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("id")
-                .eq("id", storeId)
-                .maybeSingle();
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    "Error fetching store",
-                    fetchError
-                );
-            }
+      const today = new Date();
+      const firstDayOfMonth = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1,
+      );
 
-            if (!store) {
-                throw new NotFoundException(
-                    "storeId does not exists with a store"
-                );
-            }
-            const today = new Date();
-            const firstDayOfMonth = new Date(
-                today.getFullYear(),
-                today.getMonth(),
-                1
-            );
+      // Fetch current month sales
+      const data = await this.saleItemRepo.find({
+        where: {
+          store_id: storeId,
+          created_at: Between(firstDayOfMonth, today),
+        },
+        select: ['product_variant', 'quantity', 'total_price', 'created_at'],
+        take: 5, // limit to 5 rows
+        order: {
+          created_at: 'DESC', // optional: latest 5
+        },
+      });
 
-            // Fetch current month sales
-            const { data, error } = await this.supabase
-                .from("sales")
-                .select(
-                    "productId, products(name), quantity, totalPrice, createdAt"
-                )
-                .eq("storeId", storeId)
-                .gte("createdAt", firstDayOfMonth.toISOString())
-                .lte("createdAt", today.toISOString())
-                .limit(5);
+      if (data.length === 0) {
+        return [];
+      }
 
-            if (error) throw new BadRequestException(error.message);
+      // Aggregate by product
+      const productMap: Record<
+        string,
+        { name: string; sales: number; revenue: number }
+      > = {};
 
-            if (data.length === 0) {
-                return [];
-            }
-
-            // Aggregate by product
-            const productMap: Record<
-                string,
-                { name: string; sales: number; revenue: number }
-            > = {};
-
-            for (const row of data) {
-                if (!productMap[row.products.name]) {
-                    productMap[row.products.name] = {
-                        name: row.products.name,
-                        sales: 0,
-                        revenue: 0
-                    };
-                }
-                productMap[row.products.name].sales += row.quantity;
-                productMap[row.products.name].revenue += row.totalPrice;
-            }
-
-            // Sort by units sold (desc)
-            const result = Object.values(productMap).sort(
-                (a, b) => b.sales - a.sales
-            );
-
-            return result;
-        } catch (error) {
-            if (error instanceof BadRequestException || NotFoundException) {
-                throw error;
-            }
-            this.logger.error(`Error fetching Top Selling Products: ${error}`);
-            throw new InternalServerErrorException(
-                "Failed to fetch Top Selling Products analytics"
-            );
+      for (const row of data) {
+        if (!productMap[row.product_variant.name]) {
+          productMap[row.product_variant.name] = {
+            name: row.product_variant.name,
+            sales: 0,
+            revenue: 0,
+          };
         }
+        productMap[row.product_variant.name].sales += row.quantity;
+        productMap[row.product_variant.name].revenue += row.total_price;
+      }
+
+      // Sort by units sold (desc)
+      const result = Object.values(productMap).sort(
+        (a, b) => b.sales - a.sales,
+      );
+
+      return result;
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getTopSellingProducts');
     }
+  }
 
-    async getInventoryStatusByCategory(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid storeId format");
-            }
-            // Check if storeId exist with a store
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("id")
-                .eq("id", storeId)
-                .maybeSingle();
+  async getInventoryStatusByCategory(storeId: string) {
+    try {
+      // Check if storeId exist with a store
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    "Error fetching store",
-                    fetchError
-                );
-            }
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            if (!store) {
-                throw new NotFoundException(
-                    "storeId does not exists with a store"
-                );
-            }
+      const data = await this.inventoryRepo.find({
+        where: {
+          store_id: storeId,
+        },
+        select: ['quantity', 'product_variant', 'total_quantity'],
+      });
 
-            const { data, error } = await this.supabase
-                .from("inventories")
-                .select(
-                    "productId, products(categories(name)), stock, totalStock"
-                )
-                .eq("storeId", storeId);
+      if (!data || data.length === 0) {
+        return [];
+      }
 
-            if (error) {
-                throw new BadRequestException(
-                    `Supabase error: ${error.message}`
-                );
-            }
+      // Aggregate stock and total by category
+      const categoryMap: Record<
+        string,
+        { category: string; stock: number; total: number }
+      > = {};
 
-            if (!data || data.length === 0) {
-                return [];
-            }
-
-            // Aggregate stock and total by category
-            const categoryMap: Record<
-                string,
-                { category: string; stock: number; total: number }
-            > = {};
-
-            for (const row of data) {
-                if (!categoryMap[row.products.categories.name]) {
-                    categoryMap[row.products.categories.name] = {
-                        category: row.products.categories.name,
-                        stock: 0,
-                        total: 0
-                    };
-                }
-                categoryMap[row.products.categories.name].stock +=
-                    row.stock || 0;
-                categoryMap[row.products.categories.name].total +=
-                    row.totalStock || 0;
-            }
-
-            return Object.values(categoryMap);
-        } catch (error) {
-            if (error instanceof BadRequestException || NotFoundException) {
-                throw error;
-            }
-
-            this.logger.error(`Error fetching inventory data: ${error}`);
-            throw new InternalServerErrorException(
-                "Failed to fetch inventory status analytics"
-            );
+      for (const row of data) {
+        if (!categoryMap[row.product_variant.product.category_type]) {
+          categoryMap[row.product_variant.product.category_type] = {
+            category: row.product_variant.product.category_type,
+            stock: 0,
+            total: 0,
+          };
         }
+        categoryMap[row.product_variant.product.category_type].stock +=
+          row.quantity || 0;
+        categoryMap[row.product_variant.product.category_type].total +=
+          row.total_quantity || 0;
+      }
+
+      return Object.values(categoryMap);
+    } catch (error) {
+      this.errorHandler.handleServiceError(
+        error,
+        'getInventoryStatusByCategory',
+      );
     }
-    async getLatestSales(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid storeId format");
-            }
+  }
+  async getLatestSales(storeId: string) {
+    try {
+      // Check if storeId exist with a store
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
 
-            // Check if storeId exist with a store
-            const { data: store, error: fetchError } = await this.supabase
-                .from("stores")
-                .select("id")
-                .eq("id", storeId)
-                .maybeSingle();
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            if (fetchError) {
-                throw new BadRequestException(
-                    "Error fetching store",
-                    fetchError
-                );
-            }
+      const data = await this.saleItemRepo.find({
+        where: { store_id: storeId },
+        select: ['product_variant', 'unit_price', 'created_at', 'reference'],
+        take: 5,
+        order: {
+          created_at: 'DESC',
+        },
+      });
 
-            if (!store) {
-                throw new NotFoundException(
-                    "storeId does not exists with a store"
-                );
-            }
-            const { data, error } = await this.supabase
-                .from("sales")
-                .select(
-                    "id, productId, products(name), pricePerUnit, status, createdAt"
-                )
-                .eq("storeId", storeId)
-                .order("createdAt", { ascending: false })
-                .limit(10); // get latest 10 sales
+      if (data.length === 0) {
+        return [];
+      }
 
-            if (error) {
-                throw new BadRequestException(
-                    `Supabase error: ${error.message}`
-                );
-            }
+      // Shape response
+      return data.map((row) => ({
+        saleId: row.reference,
+        product: row.product_variant.name,
+        amount: row.unit_price,
+        status: 'lowStock',
+      }));
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getLatestSales');
+    }
+  }
 
-            console.log(data);
+  async getInventorySummary(storeId: string) {
+    try {
+      // Check if storeId exist with a store
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
 
-            if (!data || data.length === 0) {
-                return [];
-            }
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
 
-            // Shape response
-            return data.map(row => ({
-                saleId: `SALE-${row.id.slice(0, 4)}`,
-                product: row.products?.name,
-                amount: row.pricePerUnit,
-                status: row.status
-            }));
-        } catch (error) {
-            if (error instanceof BadRequestException || NotFoundException) {
-                throw error;
-            }
+      // Fetch variants joined with products to filter by storeId
 
-            this.logger.error(
-                `Error fetching latest sales data: ${error.message}`
-            );
-            throw new InternalServerErrorException(
-                "Failed to fetch latest sales analytics"
-            );
+      const inventories = await this.inventoryRepo.find({
+        where: { store_id: storeId },
+        select: ['quantity', 'low_stock_quantity', 'product_variant'],
+      });
+      if (inventories.length === 0) {
+        return {
+          totalItems: 0,
+          lowStockCount: 0,
+          outOfStockCount: 0,
+        };
+      }
+
+      // Calculate counts based on variant stock
+      const totalItems = inventories.reduce((sum, v) => sum + v.quantity, 0);
+      const lowStockCount = inventories.filter(
+        (v) => v.quantity > 0 && v.quantity <= v.low_stock_quantity,
+      ).length;
+      const outOfStockCount = inventories.filter(
+        (v) => v.quantity === 0,
+      ).length;
+
+      return {
+        totalItems,
+        lowStockCount,
+        outOfStockCount,
+      };
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getInventorySummary');
+    }
+  }
+
+  async getStockLevelsByCategory(storeId: string) {
+    try {
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
+
+      if (!store)
+        throw new NotFoundException(
+          'Cannot find a store with invalid store ID',
+        );
+
+      // Fetch variants with their product + category
+
+      const inventories = await this.inventoryRepo.find({
+        where: { store_id: storeId },
+        select: ['quantity', 'product_variant'],
+      });
+
+      if (inventories.length === 0) {
+        return [];
+      }
+
+      // Build a map of category stats
+      const categoryMap: Record<
+        string,
+        {
+          category: string;
+          inStock: number;
+          lowStock: number;
+          outOfStock: number;
         }
-    }
+      > = {};
 
-    async getInventorySummary(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid format of storeId");
-            }
-            // Fetch variants joined with products to filter by storeId
-            const { data: variants, error } = await this.supabase
-                .from("variants")
-                .select("id, inventories(stock, lowStockThreshold), productId")
-                .eq("storeId", storeId);
+      for (const i of inventories) {
+        const categoryName =
+          i.product_variant.product.category_type || 'Uncategorized';
 
-            if (error) {
-                throw new BadRequestException(
-                    "Supabase Error " + error.message
-                );
-            }
-            console.log(variants);
-
-            if (variants.length === 0) {
-                return {
-                    totalItems: 0,
-                    lowStockCount: 0,
-                    outOfStockCount: 0
-                };
-            }
-
-            // Calculate counts based on variant stock
-            const totalItems = variants.reduce(
-                (sum, v) => sum + v.inventories.stock,
-                0
-            );
-            const lowStockCount = variants.filter(
-                v =>
-                    v.inventories.stock > 0 &&
-                    v.inventories.stock <= v.inventories.lowStockThreshold
-            ).length;
-            const outOfStockCount = variants.filter(
-                v => v.inventories.stock === 0
-            ).length;
-
-            return {
-                totalItems,
-                lowStockCount,
-                outOfStockCount
-            };
-        } catch (error) {
-            if (error instanceof BadRequestException) {
-                throw error;
-            }
-            this.logger.error(`Error fetching inventory summary data:
-            ${error.message}`);
-            throw new InternalServerErrorException(
-                "Failed to fetch inventory summary: " + error.message
-            );
+        if (!categoryMap[categoryName]) {
+          categoryMap[categoryName] = {
+            category: categoryName,
+            inStock: 0,
+            lowStock: 0,
+            outOfStock: 0,
+          };
         }
-    }
 
-    async getStockLevelsByCategory(storeId: string) {
-        try {
-            if (!isValidUUID(storeId)) {
-                throw new BadRequestException("Invalid format of storeId");
-            }
-            // Fetch variants with their product + category
-            const { data: inventories, error } = await this.supabase
-                .from("inventories")
-                .select(
-                    `
-          stock,
-          products!inner (
-            categories(name)
-          )
-        `
-                )
-                .eq("storeId", storeId);
-
-            if (error) {
-                throw new BadRequestException(
-                    "Supabase Error " + error.message
-                );
-            }
-
-            if (!inventories || inventories.length === 0) {
-                return [];
-            }
-
-            // Build a map of category stats
-            const categoryMap: Record<
-                string,
-                {
-                    category: string;
-                    inStock: number;
-                    lowStock: number;
-                    outOfStock: number;
-                }
-            > = {};
-
-            for (const i of inventories) {
-                const categoryName =
-                    i?.products?.categories?.name || "Uncategorized";
-
-                if (!categoryMap[categoryName]) {
-                    categoryMap[categoryName] = {
-                        category: categoryName,
-                        inStock: 0,
-                        lowStock: 0,
-                        outOfStock: 0
-                    };
-                }
-
-                if (i.stock > 5) {
-                    categoryMap[categoryName].inStock += 1;
-                } else if (i.stock > 0 && i.stock <= 5) {
-                    categoryMap[categoryName].lowStock += 1;
-                } else if (i.stock === 0) {
-                    categoryMap[categoryName].outOfStock += 1;
-                }
-            }
-
-            return Object.values(categoryMap);
-        } catch (error) {
-            if (error instanceof BadRequestException) {
-                throw error;
-            }
-            throw new InternalServerErrorException(
-                "Failed to fetch stock levels by category: " + error.message
-            );
+        if (i.quantity > 5) {
+          categoryMap[categoryName].inStock += 1;
+        } else if (i.quantity > 0 && i.quantity <= 5) {
+          categoryMap[categoryName].lowStock += 1;
+        } else if (i.quantity === 0) {
+          categoryMap[categoryName].outOfStock += 1;
         }
-    }
-    async registerBusinessAnalytics(business: any) {
-        try {
-            const record = {
-                id: uuid(),
-                business_id: business.id,
-                name: business.name,
-                owner_user_id: business.owner_user_id,
-                created_at: business.created_at
-            };
+      }
 
-            const { error } = await this.supabase
-                .from("analytics_businesses")
-                .insert([record]);
-            if (error) throw new Error(error.message);
-
-            this.logger.log(`Business registered in analytics: ${business.id}`);
-        } catch (error) {
-            this.errorHandler.handleServiceError(
-                error,
-                "registerBusinessAnalytics"
-            );
-        }
+      return Object.values(categoryMap);
+    } catch (error) {
+      this.errorHandler.handleServiceError(error, 'getStockLevelsByCategory');
     }
+  }
 }

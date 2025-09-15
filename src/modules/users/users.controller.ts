@@ -23,7 +23,10 @@ export class UsersController {
     return this.usersService.createUser(dto);
   }
 
-
+  @Post('find')
+  async findUser(@Body() dto: { email: string }) {
+    return this.usersService.findUser(dto);
+  }
 
   @Delete(':id')
   async deleteUser(@Param('id', ParseUUIDPipe) id: string) {

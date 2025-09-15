@@ -24,6 +24,7 @@ import { StoreUser } from 'src/entities/store-user.entity';
 import { User } from 'src/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { getPathFromUrl } from '../../utils/get-path';
+import path from 'path';
 @Injectable()
 export class BusinessService {
   constructor(
@@ -41,9 +42,9 @@ export class BusinessService {
 
   async registerBusiness(dto: RegisterBusinessDto, file?: Multer.File) {
     try {
+      let logoUrl;
       // 1. Check if business exists
       const existingBusiness = await this.findBusiness({
-        name: dto.business_name,
         owner_user_id: dto.owner_user_id,
       });
 
@@ -104,11 +105,7 @@ export class BusinessService {
         const path = `businesses/${dto.business_name}/${uuidv4()}_${
           file.originalname
         }`;
-        business.logo_url = await this.fileService.uploadFile(
-          file,
-          path,
-          'logos',
-        );
+        logoUrl = await this.fileService.uploadFile(file, path, 'logos');
       }
 
       // 5.Update the stripe_customer_id in business payload
@@ -119,8 +116,29 @@ export class BusinessService {
         business,
         store,
         storeUser,
+        logoUrl,
       );
-      return results;
+      return {
+        stores: [
+          {
+            store_name: results.newStore.name,
+            business_name: results.newBusiness.name,
+            store_id: results.newStore.id,
+            business_id: results.newBusiness.id,
+            currency: results.newStore.currency,
+            is_default: false,
+            location: results.newStore.location,
+          },
+        ],
+        activeStore: {
+          store_name: results.newStore.name,
+          store_id: results.newStore.id,
+          currency: results.newStore.currency,
+          location: results.newStore.location,
+          business_name: results.newBusiness.name,
+          business_id: results.newBusiness.id,
+        },
+      };
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'registerBusiness');
     }
@@ -229,11 +247,15 @@ export class BusinessService {
     businessData: Partial<Business>,
     storeData: Partial<Store>,
     storeUserData: Partial<StoreUser>,
+    logoUrl: string,
   ) {
     try {
       return await this.dataSource.transaction(async (manager) => {
         // 1. Create + save business
-        const business = await manager.create(Business, businessData);
+        const business = await manager.create(Business, {
+          ...businessData,
+          logo_url: logoUrl,
+        });
         const newBusiness = await manager.save(Business, business);
 
         // 2. Create + save store
@@ -259,6 +281,9 @@ export class BusinessService {
         return { newBusiness, newStore, newStoreUser, updatedUser };
       });
     } catch (error) {
+      const path = getPathFromUrl(logoUrl);
+      await this.fileService.deleteFile(path, 'logos');
+
       if (error instanceof NotFoundException) throw error;
       throw new HttpException(
         {

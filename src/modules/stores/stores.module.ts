@@ -7,9 +7,15 @@ import { HandleErrorService } from 'src/helpers/handle-error.helper';
 import { MailModule } from 'src/utils/mail/mail.module';
 import { UserEventsListener } from '../../event-listeners/user-events.listener';
 import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
-
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Store } from 'src/entities/store.entity';
+import { Business } from 'src/entities/business.entity';
 @Module({
-  imports: [SupabaseModule, MailModule],
+  imports: [
+    SupabaseModule,
+    MailModule,
+    TypeOrmModule.forFeature([Store, Business]),
+  ],
   controllers: [StoresController],
   providers: [
     StoresService,
