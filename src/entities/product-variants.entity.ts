@@ -37,7 +37,7 @@ export class ProductVariant {
   @Column({ type: 'uuid' })
   store_id: string;
 
-  @Column({ type: 'jsonb', array: true, default: [] })
+  @Column({ type: 'jsonb', array: true })
   attributes: Record<any, any>[];
 
   @Column({ type: 'uuid' })

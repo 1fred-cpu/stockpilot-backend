@@ -358,9 +358,7 @@ export class ProductsService {
         created_at: now,
         updated_at: now,
       }));
-      console.log(variantsData);
-
-      // 7. Transaction (product + variants + inventories)
+      // 7. Transaction (product + variants + inventories )
       return await this.dataSource.transaction(async (manager) => {
         // Insert product
         const product = manager.create(Product, productData);
@@ -370,6 +368,7 @@ export class ProductsService {
         const variantEntities = manager.create(ProductVariant, variantsData);
 
         const newVariants = await manager.save(ProductVariant, variantEntities);
+        console.log(newVariants);
 
         // Insert inventories
         const inventoryEntities = manager.create(
