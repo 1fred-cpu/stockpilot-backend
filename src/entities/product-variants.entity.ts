@@ -13,6 +13,7 @@ import { Product } from './product.entity';
 import { Store } from './store.entity';
 import { StoreInventory } from './store-inventory.entity';
 import { SaleItem } from './sale-item.entity';
+import { InventoryLog } from './inventory-log.entity';
 
 @Entity('product_variants')
 export class ProductVariant {
@@ -72,6 +73,9 @@ export class ProductVariant {
 
   @OneToMany(() => SaleItem, (sale_item) => sale_item.product_variant)
   sale_items: SaleItem[];
+
+  @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.product_variant)
+  inventory_logs: InventoryLog[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

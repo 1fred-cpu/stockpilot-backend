@@ -28,7 +28,7 @@ export class Customer {
   email: string;
 
   @Column({ type: 'text', unique: true })
-  phone: number;
+  phone: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

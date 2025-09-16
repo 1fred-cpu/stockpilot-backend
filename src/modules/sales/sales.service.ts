@@ -12,6 +12,17 @@ import { CreateSaleDto } from "./dto/create-sale.dto";
 import { generateReference } from "src/utils/generate-reference";
 import { HandleErrorService } from "src/helpers/handle-error.helper";
 import { EventEmitterHelper } from "src/helpers/event-emitter.helper";
+import { Sale } from "../../entities/sale.entity";
+import { Store } from "../../entities/store.entity";
+import { SaleItem } from "../../entities/sale-item.entity";
+import { StoreInventory } from "../../entities/store-inventory.entity";
+import { InventoryLog } from "../../entities/inventory-log.entity";
+import { Customer } from "../../entities/customer.entity";
+import { StockAlert } from "src/entities/stock-alert.entity";
+
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource, EntityManager, Between } from "typeorm";
+import { DeductStockDto } from "./dto/deduct-stock.dto";
 
 @Injectable()
 export class SalesService {
@@ -21,246 +32,22 @@ export class SalesService {
         @Inject("SUPABASE_CLIENT") private readonly supabase: any,
         private readonly inventoryService: InventoryService,
         private readonly errorHandler: HandleErrorService,
-        private readonly eventEmitterHelper: EventEmitterHelper
+        private readonly eventEmitterHelper: EventEmitterHelper,
+        @InjectRepository(Store) private readonly storeRepo: Repository<Store>,
+        @InjectRepository(Sale) private readonly saleRepo: Repository<Sale>,
+        @InjectRepository(SaleItem)
+        private readonly saleItemRepo: Repository<SaleItem>,
+        @InjectRepository(InventoryLog)
+        private readonly inventoryLogRepo: Repository<InventoryLog>,
+
+        @InjectRepository(Customer)
+        private readonly customerRepo: Repository<Customer>,
+        @InjectRepository(StockAlert)
+        private readonly stockAlertRepo: Repository<StockAlert>,
+        @InjectRepository(StoreInventory)
+        private readonly inventoryRepo: Repository<StoreInventory>,
+        private readonly dataSource: DataSource
     ) {}
-
-    // async createSale(createSaleDto: CreateSaleDto) {
-    //   try {
-    //     const { storeId, saleDate, sales } = createSaleDto;
-
-    //     // 1. Validate store ID
-    //     if (!isValidUUID(storeId)) {
-    //       throw new BadRequestException('Invalid storeId format');
-    //     }
-
-    //     // 2. Check if store exists
-    //     const { data: store, error: storeError } = await this.supabase
-    //       .from('stores')
-    //       .select('id')
-    //       .eq('id', storeId)
-    //       .maybeSingle();
-
-    //     if (storeError) {
-    //       throw new BadRequestException(
-    //         `Error checking store: ${storeError.message}`,
-    //       );
-    //     }
-    //     if (!store) {
-    //       throw new NotFoundException('Store does not exist');
-    //     }
-
-    //     const createdSales: any[] = [];
-
-    //     for (const sale of sales) {
-    //       const {
-    //         idempotencyKey,
-    //         productId,
-    //         inventoryId,
-    //         variantId,
-    //         quantity,
-    //         type,
-    //       } = sale;
-
-    //       // 3. Validate idempotency key
-    //       if (!idempotencyKey) {
-    //         throw new BadRequestException('idempotencyKey is required');
-    //       }
-
-    //       // 4. Validate product exists in the store
-    //       const { data: product, error: productError } = await this.supabase
-    //         .from('products')
-    //         .select('id')
-    //         .match({ id: productId, storeId })
-    //         .maybeSingle();
-
-    //       if (productError) {
-    //         throw new BadRequestException(
-    //           `Error checking product: ${productError.message}`,
-    //         );
-    //       }
-    //       if (!product) {
-    //         throw new NotFoundException(
-    //           `Product with ID ${productId} not found in this store`,
-    //         );
-    //       }
-
-    //       // 5. Check for duplicate sale using idempotency key
-    //       const { data: existingMovement, error: movementError } =
-    //         await this.supabase
-    //           .from('stock_movements')
-    //           .select('id')
-    //           .eq('idempotencyKey', idempotencyKey)
-    //           .maybeSingle();
-
-    //       if (movementError) {
-    //         throw new BadRequestException(
-    //           `Error checking stock movement: ${movementError.message}`,
-    //         );
-    //       }
-    //       if (existingMovement) {
-    //         this.logger.warn(`Duplicate sale skipped: ${idempotencyKey}`);
-    //         continue;
-    //       }
-
-    //       // 6. Create sale record
-    //       const { data: newSale, error: createError } = await this.supabase
-    //         .from('sales')
-    //         .upsert({
-    //           ...sale,
-    //           storeId,
-    //           variantId: variantId,
-    //           customer: sale.customer.name,
-    //           saleDate: new Date(saleDate),
-    //         })
-    //         .select()
-    //         .maybeSingle();
-
-    //       if (createError) {
-    //         throw new BadRequestException(
-    //           `Error creating sale: ${createError.message}`,
-    //         );
-    //       }
-
-    //       // 7. Create a customer
-    //       const { data: existsCustomer, error: existsError } = await this.supabase
-    //         .from('customers')
-    //         .select('*')
-    //         .match({
-    //           name: sale.customer.name,
-    //           email: sale.customer.email,
-    //           phoneNumber: sale.customer.phoneNumber,
-    //         })
-    //         .maybeSingle();
-    //       if (existsError) {
-    //         throw new BadRequestException(`Error checking customer:
-    //                 ${existsError.message}`);
-    //       }
-
-    //       if (!existsCustomer) {
-    //         const { error: customerError } = await this.supabase
-    //           .from('customers')
-    //           .upsert({
-    //             storeId: createSaleDto.storeId,
-    //             name: sale.customer.name,
-    //             email: sale.customer.email,
-    //             phoneNumber: sale.customer.phoneNumber,
-    //           });
-    //         if (customerError) {
-    //           throw new BadRequestException(`Error creating customer:
-    //                     ${customerError.message}`);
-    //         }
-    //       }
-
-    //       // 8. Adjust stock
-    //       await this.inventoryService.stockMove({
-    //         inventoryId,
-    //         change: -quantity,
-    //         type,
-    //         idempotencyKey,
-    //       });
-
-    //       createdSales.push(newSale);
-    //     }
-
-    //     return createdSales;
-    //   } catch (error) {
-    //     this.logger.error(`Error in createSale: ${error.message}`);
-    //     if (
-    //       error instanceof BadRequestException ||
-    //       error instanceof NotFoundException
-    //     ) {
-    //       throw error;
-    //     }
-    //     throw new InternalServerErrorException(
-    //       'An error occurred while creating sale record. Please try again later',
-    //     );
-    //   }
-    // }
-
-    async getSales(
-        storeId: string,
-        query: {
-            limit?: number;
-            page?: number;
-            startDate?: string;
-            endDate?: string;
-            search?: string;
-            orderBy?: string;
-            order?: "asc" | "desc";
-        }
-    ) {
-        try {
-            const limit = query.limit && query.limit > 0 ? query.limit : 10;
-            const page = query.page && query.page > 0 ? query.page : 1;
-            const from = (page - 1) * limit;
-            const to = from + limit - 1;
-
-            let supabaseQuery = this.supabase
-                .from("sales")
-                .select(
-                    `
-            id,
-            saleDate,
-            quantity,
-            pricePerUnit,
-            totalPrice,
-            customer,
-            products (id, name, category),
-            variants (id, sku, color, size, weight, dimensions)
-          `,
-                    { count: "exact" }
-                )
-                .eq("storeId", storeId);
-
-            if (query.startDate) {
-                supabaseQuery = supabaseQuery.gte("saleDate", query.startDate);
-            }
-            if (query.endDate) {
-                supabaseQuery = supabaseQuery.lte("saleDate", query.endDate);
-            }
-            if (query.search) {
-                supabaseQuery = supabaseQuery.ilike(
-                    "customer",
-                    `%${query.search}%`
-                );
-            }
-            if (query.orderBy) {
-                supabaseQuery = supabaseQuery.order(query.orderBy, {
-                    ascending: query.order === "asc"
-                });
-            } else {
-                supabaseQuery = supabaseQuery.order("saleDate", {
-                    ascending: false
-                });
-            }
-
-            supabaseQuery = supabaseQuery.range(from, to);
-
-            const { data, error, count } = await supabaseQuery;
-
-            if (error) {
-                throw new BadRequestException(
-                    `Error fetching sales: ${error.message}`
-                );
-            }
-
-            return {
-                data,
-                pagination: {
-                    total: count,
-                    page,
-                    limit,
-                    totalPages: Math.ceil((count || 0) / limit)
-                }
-            };
-        } catch (error) {
-            this.logger.error(`Error in getSales: ${error.message}`);
-            if (error instanceof BadRequestException) throw error;
-            throw new InternalServerErrorException(
-                "An error occurred while fetching sales data"
-            );
-        }
-    }
 
     async getAnalytics(storeId: string, startDate?: string, endDate?: string) {
         try {
@@ -382,74 +169,78 @@ export class SalesService {
      */
     async createSale(dto: CreateSaleDto) {
         try {
-            // Check if store exists
-            const store = await this.findStore(dto.store_id);
-
-            if (!store) {
-                throw new NotFoundException("Store not found");
-            }
-
-            // 🔹 Check if already processed (idempotency)
-            const { data: existingLog, error: logError } = await this.supabase
-                .from("inventory_logs")
-                .select("*")
-                .eq("idempotency_key", dto.idempotency_key)
-                .maybeSingle();
-
-            if (logError) {
-                throw new BadRequestException(logError.message);
-            }
-
-            if (existingLog) {
-                return {
-                    message: "Duplicate request ignored (idempotent)",
-                    reference: existingLog.reference,
-                    idempotency_key: existingLog.idempotency_key
-                };
-            }
-            // Insert customer data when provided
-            if (dto.customer) {
-                await this.createCustomer({
-                    email: dto.customer?.email,
-                    name: dto.customer?.name,
-                    phone: dto.customer?.phone,
-                    store_id: dto.store_id
+            return this.dataSource.transaction(async manager => {
+                // 1. Ensure store exists
+                const store = await manager.findOne(Store, {
+                    where: { id: dto.store_id, business_id: dto.business_id }
                 });
-            }
-            // Insert sale data
-            const { data: sale, error } = await this.supabase
-                .from("sales")
-                .insert([
-                    {
-                        id: uuidv4(),
-                        store_id: dto.store_id,
-                        business_id: dto.business_id,
-                        total_amount: dto.total_amount,
-                        net_amount: dto.total_amount,
-                        payment_status: "paid",
-                        payment_method: dto.payment_method || "cash",
-                        created_by: dto.created_by,
-                        customer_email: dto.customer?.email || null,
-                        customer_phone: dto.customer?.phone || null,
-                        customer_name: dto.customer?.name || null,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
+                if (!store) {
+                    throw new NotFoundException("Cannot find store");
+                }
+                // 2. Ensure items exists
+                for (const item of dto.items) {
+                    const existingItem = await this.inventoryRepo.findOne({
+                        where: { variant_id: item.variant_id }
+                    });
+                    if (!existingItem) {
+                        throw new NotFoundException(
+                            `Item with a variant ID ${item.variant_id} does'nt exists`
+                        );
                     }
-                ])
-                .select()
-                .maybeSingle();
 
-            if (error) throw new BadRequestException(error.message);
+                    if (item.quantity > existingItem.quantity) {
+                        throw new BadRequestException(`Not enough stock for
+                      ${item.variant_id}
+                      `);
+                    }
+                }
 
-            const saleItems: any[] = [];
-            const deductions: any[] = [];
+                // 3. Idempotency check
+                const existingLog = await manager.findOne(InventoryLog, {
+                    where: { idempotency_key: dto.idempotency_key }
+                });
+                if (existingLog) {
+                    return {
+                        message: "Duplicate request ignored (idempotent)",
+                        reference: existingLog.reference,
+                        idempotency_key: existingLog.idempotency_key
+                    };
+                }
 
-            for (const item of dto.items) {
-                // Insert sale item
-                const { data, error } = await this.supabase
-                    .from("sale_items")
-                    .insert([{
-                        id: uuidv4(),
+                // 4. Handle customer inside transaction
+                let customerEntity;
+                if (dto.customer) {
+                    customerEntity = await this.handleCustomerTransactional(
+                        manager,
+                        {
+                            email: dto.customer.email,
+                            name: dto.customer.name,
+                            phone: dto.customer.phone,
+                            store_id: dto.store_id
+                        }
+                    );
+                }
+
+                // 6. Create sale
+                const sale = manager.create(Sale, {
+                    store_id: dto.store_id,
+                    business_id: dto.business_id,
+                    total_amount: dto.total_amount,
+                    net_amount: dto.total_amount,
+                    payment_status: "paid",
+                    payment_method: dto.payment_method || "cash",
+                    created_by: dto.created_by,
+                    customer_email: customerEntity?.email || null,
+                    customer_phone: customerEntity?.phone || null,
+                    customer_name: customerEntity?.name || null
+                });
+                await manager.save(sale);
+
+                const deductions: any[] = [];
+
+                // 7. Insert sale items + build deductions
+                for (const item of dto.items) {
+                    const saleItem = manager.create(SaleItem, {
                         sale_id: sale.id,
                         variant_id: item.variant_id,
                         quantity: item.quantity,
@@ -458,16 +249,8 @@ export class SalesService {
                         total_price:
                             item.unit_price * item.quantity -
                             (item.discount || 0)
-                    }])
-                    .select("*,product_variants(id,name,image_url,sku)")
-                    .maybeSingle();
-
-                if (error) {
-                    throw new BadRequestException(error.message);
-                }
-
-                if (data) {
-                    saleItems.push(data);
+                    });
+                    await manager.save(saleItem);
 
                     deductions.push({
                         store_id: dto.store_id,
@@ -478,25 +261,81 @@ export class SalesService {
                         created_by: dto.created_by
                     });
                 }
-            }
 
-            // Deduct stock in inventory
-            await this.inventoryService.deductStock({
-                deductions,
-                idempotency_key: dto.idempotency_key || undefined
+                // 7. Deduct stock (transactional)
+                await this.deductStockTransactional(manager, {
+                    deductions,
+                    idempotency_key: dto.idempotency_key || uuidv4()
+                });
+
+                return { message: "Sale created", sale_id: sale.id };
+            });
+        } catch (error) {
+            if (
+                error instanceof NotFoundException ||
+                error instanceof BadRequestException
+            ) {
+                throw error;
+            }
+            throw new InternalServerErrorException(
+                "Request failed. Please try agian later"
+            );
+        }
+    }
+    async getSalesByDay(storeId: string, date?: string) {
+        try {
+            // Default to today if no date provided
+            const targetDate = date ? new Date(date) : new Date();
+
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date(targetDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            // Fetch sales with sale_items + product variants
+            const sales = await this.saleRepo.find({
+                where: {
+                    created_at: Between(startOfDay, endOfDay),
+                    store_id: storeId
+                },
+                relations: ["sale_items", "sale_items.product_variant"],
+                order: { created_at: "DESC" }
             });
 
-            // Emit a SaleCreated event
-            await this.eventEmitterHelper.emitEvent(
-                "sales.events",
-                dto.store_id,
-                "SaleCreated",
-                { ...sale, items: saleItems }
-            );
+            if (sales.length === 0) {
+                throw new NotFoundException(
+                    "No sales found for the selected day"
+                );
+            }
 
-            return { message: "Sale created", sale_id: sale.id };
-        } catch (error) {
-            this.errorHandler.handleServiceError(error, "createSales");
+            // 🔹 Aggregate data
+            const totalRevenue = sales.reduce(
+                (sum, sale) => sum + sale.total_amount,
+                0
+            );
+            const totalItemsSold = sales.reduce(
+                (sum, sale) =>
+                    sum +
+                    sale.sale_items.reduce(
+                        (iSum, item) => iSum + item.quantity,
+                        0
+                    ),
+                0
+            );
+            const averageSaleValue = totalRevenue / sales.length;
+
+            return {
+                date: startOfDay.toISOString().split("T")[0],
+                totalSales: sales.length,
+                totalRevenue,
+                totalItemsSold,
+                averageSaleValue,
+                sales
+            };
+        } catch (error: any) {
+            if (error instanceof NotFoundException) throw error;
+            this.errorHandler.handleServiceError(error, "getSalesByDay");
         }
     }
 
@@ -559,6 +398,130 @@ export class SalesService {
 
         if (error) throw new BadRequestException(error.message);
     }
+    private async deductStockTransactional(manager: any, dto: DeductStockDto) {
+        const key = dto.idempotency_key || uuidv4();
+
+        // Check if already processed
+        const existingLogs = await manager.find(InventoryLog, {
+            where: { idempotency_key: key }
+        });
+        if (existingLogs.length > 0) {
+            return {
+                message: "Duplicate request ignored (idempotent)",
+                deductions: existingLogs.map(log => ({
+                    variant_id: log.variant_id,
+                    deducted: log.change,
+                    reason: log.reason,
+                    created_at: log.created_at
+                })),
+                idempotency_key: key
+            };
+        }
+
+        const results: any[] = [];
+
+        for (const deduction of dto.deductions) {
+            // 1. Get inventory row
+            const inventory = await manager.findOne(StoreInventory, {
+                where: {
+                    store_id: deduction.store_id,
+                    variant_id: deduction.variant_id
+                }
+            });
+
+            if (!inventory) {
+                throw new NotFoundException(
+                    `Inventory not found for variant ${deduction.variant_id}`
+                );
+            }
+
+            // 2. Check stock availability
+            if (inventory.quantity < deduction.quantity) {
+                throw new BadRequestException(
+                    `Not enough stock for variant ${deduction.variant_id}`
+                );
+            }
+
+            // 3. Update stock
+            inventory.quantity = inventory.quantity - deduction.quantity;
+            await manager.save(inventory);
+
+            // 4. Log deduction
+            const log = manager.create(InventoryLog, {
+                idempotency_key: key,
+                inventory_id: inventory.id,
+                change: deduction.quantity,
+                type: "deduct",
+                reference: deduction.reference,
+                created_by: deduction.created_by,
+                store_id: deduction.store_id,
+                variant_id: deduction.variant_id,
+                reason: deduction.reason
+            });
+            await manager.save(log);
+
+            // 5. Push result
+            results.push({
+                variant_id: deduction.variant_id,
+                deducted: deduction.quantity,
+                remaining: inventory.quantity
+            });
+
+            // 6. Low stock alert (optional: save in `stock_alerts`)
+            if (inventory.quantity <= inventory.low_stock_threshold) {
+                const alert = manager.create(StockAlert, {
+                    threshold: inventory.low_stock_threshold,
+                    status: "low stock",
+                    triggered_at: new Date(),
+                    inventory_id: inventory.id,
+                    stock_at_trigger: inventory.quantity,
+                    store_id: deduction.store_id
+                });
+                await manager.save(alert);
+            }
+        }
+
+        return {
+            message: "Stock deducted successfully",
+            deductions: results,
+            idempotency_key: key
+        };
+    }
+
+    private async handleCustomerTransactional(
+        manager: EntityManager,
+        customer: {
+            store_id: string;
+            name?: string;
+            email?: string;
+            phone?: string;
+        }
+    ) {
+        // Try to find existing customer by email/phone within store
+        const existing = await manager.findOne(Customer, {
+            where: [
+                { store_id: customer.store_id, email: customer.email },
+                { store_id: customer.store_id, phone: customer.phone }
+            ]
+        });
+
+        if (existing) {
+            // Update customer
+            existing.name = customer.name || existing.name;
+            existing.email = customer.email || existing.email;
+            existing.phone = customer.phone || existing.phone;
+            return manager.save(existing);
+        } else {
+            // Insert new
+            const newCustomer = manager.create(Customer, {
+                store_id: customer.store_id,
+                name: customer.name,
+                email: customer.email,
+                phone: customer.phone
+            });
+            return manager.save(newCustomer);
+        }
+    }
 
     /**
      *
@@ -566,55 +529,33 @@ export class SalesService {
      * @returns
      */
     private async findStore(storeId: string) {
-        const { data: store, error } = await this.supabase
-            .from("stores")
-            .select("*")
-            .eq("id", storeId)
-            .maybeSingle();
-
-        if (error) {
-            throw new BadRequestException(error.message);
-        }
-
+        const store = await this.storeRepo.findOne({
+            where: { id: storeId }
+        });
         return store;
     }
     /** 
   @param dto
  */
-    private async createCustomer(dto: any) {
+    private async handleCustomer(dto: any) {
         // 1. Check customer exists
-        const { data: existingCustomer, error: fetchError } =
-            await this.supabase
-                .from("customers")
-                .select("*")
-                .eq("email", dto.email)
-                .maybeSingle();
-        if (fetchError) {
-            throw new BadRequestException(fetchError.message);
-        }
+        const existingCustomer = await this.customerRepo.findOne({
+            where: { email: dto.email }
+        });
 
         if (existingCustomer) {
             return existingCustomer;
         }
 
         // 2. Create customer if not exists
-        const { data: newCustomer, error: createError } = await this.supabase
-            .from("customers")
-            .insert([
-                {
-                    id: uuidv4(),
-                    name: dto.name,
-                    email: dto.email,
-                    store_id: dto.store_id,
-                    phone: dto.phone
-                }
-            ])
-            .select()
-            .maybeSingle();
-        if (createError) {
-            throw new BadRequestException(createError.message);
-        }
-
+        const newCustomer = await this.customerRepo.create({
+            id: uuidv4(),
+            name: dto.name,
+            email: dto.email,
+            store_id: dto.store_id,
+            phone: dto.phone
+        });
+        await this.customerRepo.save(newCustomer);
         return newCustomer;
     }
 }

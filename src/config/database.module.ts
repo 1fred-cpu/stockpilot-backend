@@ -9,6 +9,8 @@ import { Product } from "src/entities/product.entity";
 import { Category } from "src/entities/category.entity";
 import { ProductVariant } from "src/entities/product-variants.entity";
 import { StoreInventory } from "src/entities/store-inventory.entity";
+import { InventoryLog } from "src/entities/inventory-log.entity";
+import { StockAlert } from "src/entities/stock-alert.entity";
 
 @Module({
     imports: [
@@ -29,7 +31,9 @@ import { StoreInventory } from "src/entities/store-inventory.entity";
                     Product,
                     Category,
                     ProductVariant,
-                    StoreInventory
+                    StoreInventory,
+                    InventoryLog,
+                    StockAlert,
                 ]
             })
         })

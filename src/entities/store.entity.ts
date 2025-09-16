@@ -16,6 +16,8 @@ import { StoreInventory } from './store-inventory.entity';
 import { Sale } from './sale.entity';
 import { Customer } from './customer.entity';
 import { SaleItem } from './sale-item.entity';
+import { StockAlert } from './stock-alert.entity';
+import { InventoryLog } from './inventory-log.entity';
 
 @Entity('stores')
 export class Store {
@@ -74,4 +76,12 @@ export class Store {
   // 👇 Relation: one store can have many sale_items
   @OneToMany(() => SaleItem, (sale_item) => sale_item.store)
   sale_items: SaleItem[];
+  
+  // 👇 Relation: one store can have many inventory_logs
+  @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.store)
+  inventory_logs: InventoryLog[];
+  
+  // 👇 Relation: one store can have many stock_alerts
+  @OneToMany(() => StockAlert, (stock_alert) => stock_alert.store)
+  stock_alerts: StockAlert[];
 }

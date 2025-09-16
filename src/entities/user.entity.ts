@@ -12,6 +12,7 @@ import { Store } from './store.entity';
 import { Business } from './business.entity';
 import { StoreUser } from './store-user.entity';
 import { Sale } from './sale.entity';
+import { InventoryLog } from './inventory-log.entity';
 
 @Entity('users')
 export class User {
@@ -64,4 +65,8 @@ export class User {
   // 👇 Relation: one user can create multiple sales
   @OneToMany(() => Sale, (sale) => sale.user)
   sales: Sale[];
+  
+  // 👇 Relation: one user can create multiple inventory logs
+  @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.user)
+  inventory_logs: InventoryLog[];
 }

@@ -9,8 +9,30 @@ import { SalesEventsListener } from "src/event-listeners/sales-events.listener";
 import { ReceiptService } from "../../helpers/reciept.helper";
 import { ReceiptPdfService } from "../../helpers/reciept-pdf.helper";
 import { MailModule } from "../../utils/mail/mail.module";
+import { Sale } from "../../entities/sale.entity";
+import { Store } from "../../entities/store.entity";
+import { SaleItem } from "../../entities/sale-item.entity";
+import { InventoryLog } from "../../entities/inventory-log.entity";
+import { Customer } from "../../entities/customer.entity";
+import { StoreInventory } from "../../entities/store-inventory.entity";
+import { StockAlert } from "src/entities/stock-alert.entity";
+
+import { TypeOrmModule } from "@nestjs/typeorm";
+
 @Module({
-    imports: [SupabaseModule, InventoryModule, MailModule],
+    imports: [
+        SupabaseModule,
+        InventoryModule,
+        MailModule,
+        TypeOrmModule.forFeature([
+            Sale,
+            Store,
+            SaleItem,
+            InventoryLog,
+            Customer,
+            StoreInventory,StockAlert
+        ])
+    ],
     controllers: [SalesController],
     providers: [
         SalesService,
