@@ -24,7 +24,9 @@ export class HandleErrorService {
     ) {
       throw error;
     }
-    this.logger.error(`Unexpected error in ${method}: ${error.message}`);
+    this.logger.error(
+      `Unexpected error in ${method}: ${error.message} \n${error.stack}`,
+    );
     throw new InternalServerErrorException('An unexpected error occurred');
   }
 }

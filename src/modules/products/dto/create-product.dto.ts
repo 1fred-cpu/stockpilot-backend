@@ -1,97 +1,144 @@
 import {
-    IsString,
-    IsOptional,
-    IsNumber,
-    IsArray,
-    ValidateNested,
-    IsUUID,
-    Min,
-    IsDateString,
-    IsBoolean
-} from "class-validator";
-import { Type } from "class-transformer";
-import { Multer } from "multer";
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+  IsUUID,
+  Min,
+  IsDateString,
+  IsBoolean,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { Multer } from 'multer';
+
 export class CreateVariantDto {
-    @IsOptional()
-    @IsUUID()
-    id?: string;
+  @IsOptional()
+  @IsUUID()
+  id?: string;
 
-    @IsString()
-    name: string;
+  @IsString()
+  name: string;
 
-    @IsString()
-    sku: string;
+  @IsString()
+  sku: string;
 
-    @IsNumber()
-    @Min(0)
-    price: number;
+  @IsNumber()
+  @Min(0)
+  price: number;
 
-    @IsNumber()
-    @Min(0)
-    quantity: number;
+  @IsNumber()
+  @Min(0)
+  quantity: number;
 
-    @IsNumber()
-    @Min(0)
-    reserved: number;
+  @IsNumber()
+  @Min(0)
+  reserved: number;
 
-    @IsNumber()
-    @Min(0)
-    low_stock_threshold: number;
+  @IsNumber()
+  @Min(0)
+  low_stock_threshold: number;
 
-    @IsOptional()
-    @IsString()
-    image_url: string; // base64 string or file path, depending on frontend
+  @IsOptional()
+  @IsString()
+  image_url: string;
 
-    @IsOptional()
-    image_file: Multer.File;
+  @IsOptional()
+  image_file: Multer.File;
 
-    @IsOptional()
-    @IsArray()
-    attributes: Record<string, any>[];
+  @IsOptional()
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        // ensure it's always an array
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  attributes: Record<string, any>[];
 
-    @IsOptional()
-    @IsDateString()
-    expiry_date?: string; // optional for non-food products
+  @IsOptional()
+  @IsDateString()
+  expiry_date?: string;
 }
 
 export class CreateProductDto {
-    @IsUUID()
-    business_id: string;
+  @IsOptional()
+  @IsUUID()
+  business_id: string;
 
-    @IsString()
-    business_name: string;
+  @IsString()
+  business_name: string;
 
-    @IsUUID()
-    store_id: string;
+  @IsUUID()
+  store_id: string;
 
-    @IsString()
-    name: string;
+  @IsString()
+  name: string;
 
-    @IsString()
-    description?: string;
+  @IsString()
+  description?: string;
 
-    @IsOptional()
-    thumbnail?: Multer.File;
+  @IsOptional()
+  thumbnail?: Multer.File;
 
-    @IsString()
-    category?: string;
+  @IsString()
+  category?: string;
 
-    @IsString()
-    brand?: string;
+  @IsString()
+  brand?: string;
 
-    @IsOptional()
-    @IsBoolean()
-    track_batches?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  track_batches?: boolean;
 
-    @IsOptional()
-    @IsArray()
-    tags?: string[];
+  // 👇 Transform stringified JSON into an array
+  @IsOptional()
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  tags?: string[];
 
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => CreateVariantDto)
-    variants: CreateVariantDto[];
+  // 👇 Variants also need parsing when sent as JSON string
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateVariantDto)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  variants: CreateVariantDto[];
 
-    @IsOptional()
-    removedVariantIds: string[];
+  @IsOptional()
+  @IsArray()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  removedVariantIds: string[];
 }
