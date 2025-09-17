@@ -22,6 +22,7 @@ import { ProductVariant } from '../../entities/product-variants.entity';
 import { Product } from '../../entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { Category } from 'src/entities/category.entity';
 
 @Injectable()
 export class ProductsService {
@@ -39,40 +40,29 @@ export class ProductsService {
     private readonly businessRepo: Repository<Business>,
     @InjectRepository(StoreInventory)
     private readonly inventoryRepo: Repository<StoreInventory>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
     private readonly dataSource: DataSource,
   ) {}
 
   /**
    *
    * @param name
-   * @param businessId
-   * @returns a boolean value
+   * @param storeId
+   * @returns a array of categories created by store
    */
-  private async doProductExists(
-    name: string,
-    businessId: string,
-  ): Promise<boolean | undefined> {
+  async findStoreCatgories(storeId: string) {
     try {
-      const { data: existingProduct, error: existsError } = await this.supabase
-        .from('products')
-        .select('id')
-        .match({
-          business_id: businessId,
-          name,
-        })
-        .maybeSingle();
+      const categories = await this.categoryRepo.find({
+        where: { store_id: storeId },
+      });
 
-      if (existsError) {
-        throw new BadRequestException(existsError.message);
+      if (categories.length === 0) {
+        return [];
       }
-
-      if (existingProduct) {
-        return true;
-      } else {
-        return false;
-      }
+      return categories;
     } catch (error) {
-      this.errorHandler.handleServiceError(error, 'doProductExists');
+      this.errorHandler.handleServiceError(error, 'findStoreCatgories');
     }
   }
 
@@ -83,21 +73,22 @@ export class ProductsService {
    */
   async findAllProductsByBusiness(businessId: string) {
     try {
-      const data = await this.productRepo.find({
+      const products = await this.productRepo.find({
         where: {
           business_id: businessId,
         },
-        relations: {
-          product_variants: {
-            store_inventories: true,
-            //                 store_inventory_batches: true
-          },
-        },
+        relations: ['product_variants', 'product_variants.store_inventories'],
         select: {
           id: true,
           name: true,
           description: true,
-          // 👇 select only fields you need
+          business_id: true,
+          brand: true,
+          category_type: true,
+          tags: true,
+          thumbnail: true,
+          created_at: true,
+          updated_at: true,
           product_variants: {
             id: true,
             name: true,
@@ -106,30 +97,26 @@ export class ProductsService {
             image_url: true,
             store_id: true,
             store_inventories: true,
-            //                        store_inventory_batches: true
           },
         },
+        order: { created_at: 'DESC' },
       });
-      if (data.length === 0) {
+
+      if (products.length === 0) {
         return [];
       }
 
-      const products = data.map((p) => ({
-        id: p.id,
-        business_id: p.business_id,
-        name: p.name,
-        description: p.description,
-        category: p.category,
-        brand: p.brand,
-        //              track_batches: p.track_batches,
-        tags: p.tags,
-        thumbnail: p.thumbnail,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        product_variants: p.product_variants || [],
+      // transform inventories -> single object
+      const normalizedProducts = products.map((p) => ({
+        ...p,
+        product_variants: p.product_variants.map((v) => ({
+          ...v,
+          inventory: v.store_inventories?.[0] || null, // pick the first one
+          store_inventories: undefined, // remove original array form
+        })),
       }));
 
-      return products;
+      return normalizedProducts;
     } catch (err) {
       this.errorHandler.handleServiceError(err, 'findAllByBusiness');
     }
@@ -141,21 +128,22 @@ export class ProductsService {
    */
   async findProduct(productId: string, storeId: string) {
     try {
-      const data = await this.productRepo.findOne({
+      const product = await this.productRepo.findOne({
         where: {
-          id: productId,
+          product_variants: { store_id: storeId, product_id: productId },
         },
-        relations: {
-          product_variants: {
-            store_inventories: true,
-            //store_inventory_batches: true
-          },
-        },
+        relations: ['product_variants', 'product_variants.store_inventories'],
         select: {
           id: true,
           name: true,
           description: true,
-          // 👇 select only fields you need
+          business_id: true,
+          brand: true,
+          category_type: true,
+          tags: true,
+          thumbnail: true,
+          created_at: true,
+          updated_at: true,
           product_variants: {
             id: true,
             name: true,
@@ -164,28 +152,30 @@ export class ProductsService {
             image_url: true,
             store_id: true,
             store_inventories: true,
-            //                        store_inventory_batches: true
           },
         },
+        order: { created_at: 'DESC' },
       });
-      if (!data) throw new NotFoundException('Product not found');
 
-      const product = {
-        id: data.id,
-        business_id: data.business_id,
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        brand: data.brand,
-        //track_batches: data.track_batches,
-        tags: data.tags,
-        thumbnail: data.thumbnail,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        product_variants: data.product_variants || [],
+      if (!product) {
+        throw new NotFoundException('Product not found ');
+      }
+
+      // transform inventories -> single object
+      const normalizedProduct = {
+        ...product,
+        product_variants: product?.product_variants.map((v) => ({
+          ...v,
+          inventory: v.store_inventories?.[0] || null, // pick the first one
+          store_inventories: undefined, // remove original array form
+        })),
       };
 
-      return this.discountsService.applyDiscounts(storeId, [product]);
+      const discountedProduct: any = await this.discountsService.applyDiscounts(
+        storeId,
+        [normalizedProduct],
+      );
+      return { product: discountedProduct[0] };
     } catch (err) {
       this.errorHandler.handleServiceError(err, 'findOne');
     }
@@ -198,23 +188,23 @@ export class ProductsService {
    */
   async findAllProductsByStore(storeId: string) {
     try {
-      const data = await this.productRepo.find({
+      // Load only necessary fields + relations
+      const products = await this.productRepo.find({
         where: {
-          product_variants: {
-            store_id: storeId, // filter inside variants
-          },
+          product_variants: { store_id: storeId },
         },
-        relations: {
-          product_variants: {
-            store_inventories: true,
-            //                 store_inventory_batches: true
-          },
-        },
+        relations: ['product_variants', 'product_variants.store_inventories'],
         select: {
           id: true,
           name: true,
           description: true,
-          // 👇 select only fields you need
+          business_id: true,
+          brand: true,
+          category_type: true,
+          tags: true,
+          thumbnail: true,
+          created_at: true,
+          updated_at: true,
           product_variants: {
             id: true,
             name: true,
@@ -223,33 +213,36 @@ export class ProductsService {
             image_url: true,
             store_id: true,
             store_inventories: true,
-            //                        store_inventory_batches: true
           },
         },
+        order: { created_at: 'DESC' },
       });
-      if (data.length === 0) {
-        return [];
-      }
 
-      const products = (data || []).map((p) => ({
-        id: p.id,
-        business_id: p.business_id,
-        name: p.name,
-        description: p.description,
-        category: p.category_type,
-        brand: p.brand,
-        tags: p.tags,
-        thumbnail: p.thumbnail,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        product_variants: p.product_variants || [],
+      // transform inventories -> single object
+      const normalizedProducts = products.map((p) => ({
+        ...p,
+        product_variants: p.product_variants.map((v) => ({
+          ...v,
+          inventory: v.store_inventories?.[0] || null, // pick the first one
+          store_inventories: undefined, // remove original array form
+        })),
       }));
 
-      return this.discountsService.applyDiscounts(storeId, products);
+      const discountedProducts = await this.discountsService.applyDiscounts(
+        storeId,
+        normalizedProducts,
+      );
+
+      return { products: discountedProducts };
     } catch (err) {
-      this.errorHandler.handleServiceError(err, 'findAllByStore');
+      this.errorHandler.handleServiceError(
+        err,
+        'ProductsService.findAllProductsByStore',
+      );
+      throw err; // rethrow so higher layers know it failed
     }
   }
+
   /**
    *
    * @param businessId
@@ -352,6 +345,7 @@ export class ProductsService {
         business_id: businessId,
         store_id: dto.store_id,
         variant_id: variant.id,
+        total_quantity: dto.variants[index].quantity,
         quantity: dto.variants[index].quantity,
         reserved: dto.variants[index].reserved,
         low_stock_threshold: dto.variants[index].low_stock_threshold,

@@ -150,8 +150,14 @@ export class ProductsController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @Get('stores/:storeId/categories')
+  async findStoreCategories(@Param('storeId', ParseUUIDPipe) storeId: string) {
+    return this.productsService.findStoreCatgories(storeId);
+  }
+
+  @HttpCode(HttpStatus.OK)
   @Get(':businessId/products')
-  findAllProductsByBusiness(
+  async findAllProductsByBusiness(
     @Param('businessId', ParseUUIDPipe) businessId: string,
   ) {
     return this.productsService.findAllProductsByBusiness(businessId);
@@ -159,7 +165,7 @@ export class ProductsController {
 
   @HttpCode(HttpStatus.OK)
   @Get('stores/:storeId/products/:productId')
-  findProduct(
+  async findProduct(
     @Param('productId', ParseUUIDPipe) productId: string,
     @Param('storeId', ParseUUIDPipe) storeId: string,
   ) {
@@ -167,8 +173,10 @@ export class ProductsController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @Get('/stores/:storeId/products')
-  findAllProductsByStore(@Param('storeId', ParseUUIDPipe) storeId: string) {
+  @Get('stores/:storeId/products')
+  async findAllProductsByStore(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+  ) {
     return this.productsService.findAllProductsByStore(storeId);
   }
 }

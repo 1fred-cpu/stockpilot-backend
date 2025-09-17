@@ -38,8 +38,8 @@ export class ProductVariant {
   @Column({ type: 'uuid' })
   store_id: string;
 
-  @Column({ type: 'jsonb', array: true })
-  attributes: Record<any, any>[];
+  // @Column({ type: 'jsonb', array: true })
+  // attributes: Record<any, any>[];
 
   @Column({ type: 'uuid' })
   business_id: string;
@@ -74,7 +74,10 @@ export class ProductVariant {
   @OneToMany(() => SaleItem, (sale_item) => sale_item.product_variant)
   sale_items: SaleItem[];
 
-  @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.product_variant)
+  @OneToMany(
+    () => InventoryLog,
+    (inventory_log) => inventory_log.product_variant,
+  )
   inventory_logs: InventoryLog[];
 
   @CreateDateColumn({ type: 'timestamptz' })
