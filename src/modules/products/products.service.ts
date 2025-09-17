@@ -1,700 +1,727 @@
 import {
-  Injectable,
-  Inject,
-  BadRequestException,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { generateSlug } from 'src/utils/slug-generator';
-import { HandleErrorService } from 'src/helpers/handle-error.helper';
-import { VariantsService } from './variants.service';
-import { getPathFromUrl } from 'src/utils/get-path';
-import { FileUploadService } from 'src/utils/upload-file';
-import { Multer } from 'multer';
-import { DiscountsService } from '../discounts/discounts.service';
-import { StoreInventory } from '../../entities/store-inventory.entity';
-import { Business } from '../../entities/business.entity';
-import { ProductVariant } from '../../entities/product-variants.entity';
-import { Product } from '../../entities/product.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { Category } from 'src/entities/category.entity';
+    Injectable,
+    Inject,
+    BadRequestException,
+    NotFoundException,
+    ConflictException
+} from "@nestjs/common";
+import { v4 as uuidv4 } from "uuid";
+import { CreateProductDto } from "./dto/create-product.dto";
+import { UpdateProductDto } from "./dto/update-product.dto";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { generateSlug } from "src/utils/slug-generator";
+import { HandleErrorService } from "src/helpers/handle-error.helper";
+import { VariantsService } from "./variants.service";
+import { getPathFromUrl } from "src/utils/get-path";
+import { FileUploadService } from "src/utils/upload-file";
+import { Multer } from "multer";
+import { DiscountsService } from "../discounts/discounts.service";
+import { StoreInventory } from "../../entities/store-inventory.entity";
+import { Business } from "../../entities/business.entity";
+import { FailedFileDeletion } from
+"../../entities/failed-file-deletion.entity";
+import { ProductVariant } from "../../entities/product-variants.entity";
+import { Product } from "../../entities/product.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { Category } from "src/entities/category.entity";
 
 @Injectable()
 export class ProductsService {
-  constructor(
-    @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly errorHandler: HandleErrorService,
-    private readonly variantService: VariantsService,
-    private readonly fileService: FileUploadService,
-    private readonly discountsService: DiscountsService,
-    @InjectRepository(Product)
-    private readonly productRepo: Repository<Product>,
-    @InjectRepository(ProductVariant)
-    private readonly variantRepo: Repository<ProductVariant>,
-    @InjectRepository(Business)
-    private readonly businessRepo: Repository<Business>,
-    @InjectRepository(StoreInventory)
-    private readonly inventoryRepo: Repository<StoreInventory>,
-    @InjectRepository(Category)
-    private readonly categoryRepo: Repository<Category>,
-    private readonly dataSource: DataSource,
-  ) {}
+    constructor(
+        @Inject("SUPABASE_CLIENT") private readonly supabase: SupabaseClient,
+        private readonly errorHandler: HandleErrorService,
+        private readonly variantService: VariantsService,
+        private readonly fileService: FileUploadService,
+        private readonly discountsService: DiscountsService,
+        @InjectRepository(Product)
+        private readonly productRepo: Repository<Product>,
+        @InjectRepository(ProductVariant)
+        private readonly variantRepo: Repository<ProductVariant>,
+        @InjectRepository(Business)
+        private readonly businessRepo: Repository<Business>,
+        @InjectRepository(StoreInventory)
+        private readonly inventoryRepo: Repository<StoreInventory>,
+        @InjectRepository(Category)
+        private readonly categoryRepo: Repository<Category>,
+        private readonly dataSource: DataSource
+    ) {}
 
-  /**
-   *
-   * @param name
-   * @param storeId
-   * @returns a array of categories created by store
-   */
-  async findStoreCatgories(storeId: string) {
-    try {
-      const categories = await this.categoryRepo.find({
-        where: { store_id: storeId },
-      });
+    /**
+     *
+     * @param name
+     * @param storeId
+     * @returns a array of categories created by store
+     */
+    async findStoreCatgories(storeId: string) {
+        try {
+            const categories = await this.categoryRepo.find({
+                where: { store_id: storeId }
+            });
 
-      if (categories.length === 0) {
-        return [];
-      }
-      return categories;
-    } catch (error) {
-      this.errorHandler.handleServiceError(error, 'findStoreCatgories');
+            if (categories.length === 0) {
+                return [];
+            }
+            return categories;
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "findStoreCatgories");
+        }
     }
-  }
 
-  /**
-   *
-   * @param businessId
-   * @returns
-   */
-  async findAllProductsByBusiness(businessId: string) {
-    try {
-      const products = await this.productRepo.find({
-        where: {
-          business_id: businessId,
-        },
-        relations: ['product_variants', 'product_variants.store_inventories'],
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          business_id: true,
-          brand: true,
-          category_type: true,
-          tags: true,
-          thumbnail: true,
-          created_at: true,
-          updated_at: true,
-          product_variants: {
-            id: true,
-            name: true,
-            sku: true,
-            price: true,
-            image_url: true,
-            store_id: true,
-            store_inventories: true,
-          },
-        },
-        order: { created_at: 'DESC' },
-      });
+    /**
+     *
+     * @param businessId
+     * @returns
+     */
+    async findAllProductsByBusiness(businessId: string) {
+        try {
+            const products = await this.productRepo.find({
+                where: {
+                    business_id: businessId
+                },
+                relations: [
+                    "product_variants",
+                    "product_variants.store_inventories"
+                ],
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    business_id: true,
+                    brand: true,
+                    category_type: true,
+                    tags: true,
+                    thumbnail: true,
+                    created_at: true,
+                    updated_at: true,
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                    }
+                },
+                order: { created_at: "DESC" }
+            });
 
-      if (products.length === 0) {
-        return [];
-      }
+            if (products.length === 0) {
+                return [];
+            }
 
-      // transform inventories -> single object
-      const normalizedProducts = products.map((p) => ({
-        ...p,
-        product_variants: p.product_variants.map((v) => ({
-          ...v,
-          inventory: v.store_inventories?.[0] || null, // pick the first one
-          store_inventories: undefined, // remove original array form
-        })),
-      }));
+            // transform inventories -> single object
+            const normalizedProducts = products.map(p => ({
+                ...p,
+                product_variants: p.product_variants.map(v => ({
+                    ...v,
+                    inventory: v.store_inventories?.[0] || null, // pick the first one
+                    store_inventories: undefined // remove original array form
+                }))
+            }));
 
-      return normalizedProducts;
-    } catch (err) {
-      this.errorHandler.handleServiceError(err, 'findAllByBusiness');
+            return normalizedProducts;
+        } catch (err) {
+            this.errorHandler.handleServiceError(err, "findAllByBusiness");
+        }
     }
-  }
-  /**
-   *
-   * @param productId
-   * @returns
-   */
-  async findProduct(productId: string, storeId: string) {
-    try {
-      const product = await this.productRepo.findOne({
-        where: {
-          product_variants: { store_id: storeId, product_id: productId },
-        },
-        relations: ['product_variants', 'product_variants.store_inventories'],
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          business_id: true,
-          brand: true,
-          category_type: true,
-          tags: true,
-          thumbnail: true,
-          created_at: true,
-          updated_at: true,
-          product_variants: {
-            id: true,
-            name: true,
-            sku: true,
-            price: true,
-            image_url: true,
-            store_id: true,
-            store_inventories: true,
-          },
-        },
-        order: { created_at: 'DESC' },
-      });
+    /**
+     *
+     * @param productId
+     * @returns
+     */
+    async findProduct(productId: string, storeId: string) {
+        try {
+            const product = await this.productRepo.findOne({
+                where: {
+                    product_variants: {
+                        store_id: storeId,
+                        product_id: productId
+                    }
+                },
+                relations: [
+                    "product_variants",
+                    "product_variants.store_inventories"
+                ],
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    business_id: true,
+                    brand: true,
+                    category_type: true,
+                    tags: true,
+                    thumbnail: true,
+                    created_at: true,
+                    updated_at: true,
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                    }
+                },
+                order: { created_at: "DESC" }
+            });
 
-      if (!product) {
-        throw new NotFoundException('Product not found ');
-      }
+            if (!product) {
+                throw new NotFoundException("Product not found ");
+            }
 
-      // transform inventories -> single object
-      const normalizedProduct = {
-        ...product,
-        product_variants: product?.product_variants.map((v) => ({
-          ...v,
-          inventory: v.store_inventories?.[0] || null, // pick the first one
-          store_inventories: undefined, // remove original array form
-        })),
-      };
+            // transform inventories -> single object
+            const normalizedProduct = {
+                ...product,
+                product_variants: product?.product_variants.map(v => ({
+                    ...v,
+                    inventory: v.store_inventories?.[0] || null, // pick the first one
+                    store_inventories: undefined // remove original array form
+                }))
+            };
 
-      const discountedProduct: any = await this.discountsService.applyDiscounts(
-        storeId,
-        [normalizedProduct],
-      );
-      return { product: discountedProduct[0] };
-    } catch (err) {
-      this.errorHandler.handleServiceError(err, 'findOne');
+            const discountedProduct: any =
+                await this.discountsService.applyDiscounts(storeId, [
+                    normalizedProduct
+                ]);
+            return { product: discountedProduct[0] };
+        } catch (err) {
+            this.errorHandler.handleServiceError(err, "findOne");
+        }
     }
-  }
 
-  /**
-   *
-   * @param storeId
-   * @returns
-   */
-  async findAllProductsByStore(storeId: string) {
-    try {
-      // Load only necessary fields + relations
-      const products = await this.productRepo.find({
-        where: {
-          product_variants: { store_id: storeId },
-        },
-        relations: ['product_variants', 'product_variants.store_inventories'],
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          business_id: true,
-          brand: true,
-          category_type: true,
-          tags: true,
-          thumbnail: true,
-          created_at: true,
-          updated_at: true,
-          product_variants: {
-            id: true,
-            name: true,
-            sku: true,
-            price: true,
-            image_url: true,
-            store_id: true,
-            store_inventories: true,
-          },
-        },
-        order: { created_at: 'DESC' },
-      });
+    /**
+     *
+     * @param storeId
+     * @returns
+     */
+    async findAllProductsByStore(storeId: string) {
+        try {
+            // Load only necessary fields + relations
+            const products = await this.productRepo.find({
+                where: {
+                    product_variants: { store_id: storeId }
+                },
+                relations: [
+                    "product_variants",
+                    "product_variants.store_inventories"
+                ],
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    business_id: true,
+                    brand: true,
+                    category_type: true,
+                    tags: true,
+                    thumbnail: true,
+                    created_at: true,
+                    updated_at: true,
+                    product_variants: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        price: true,
+                        image_url: true,
+                        store_id: true,
+                        store_inventories: true
+                    }
+                },
+                order: { created_at: "DESC" }
+            });
 
-      // transform inventories -> single object
-      const normalizedProducts = products.map((p) => ({
-        ...p,
-        product_variants: p.product_variants.map((v) => ({
-          ...v,
-          inventory: v.store_inventories?.[0] || null, // pick the first one
-          store_inventories: undefined, // remove original array form
-        })),
-      }));
+            // transform inventories -> single object
+            const normalizedProducts = products.map(p => ({
+                ...p,
+                product_variants: p.product_variants.map(v => ({
+                    ...v,
+                    inventory: v.store_inventories?.[0] || null, // pick the first one
+                    store_inventories: undefined // remove original array form
+                }))
+            }));
 
-      const discountedProducts = await this.discountsService.applyDiscounts(
-        storeId,
-        normalizedProducts,
-      );
+            const discountedProducts =
+                await this.discountsService.applyDiscounts(
+                    storeId,
+                    normalizedProducts
+                );
 
-      return { products: discountedProducts };
-    } catch (err) {
-      this.errorHandler.handleServiceError(
-        err,
-        'ProductsService.findAllProductsByStore',
-      );
-      throw err; // rethrow so higher layers know it failed
+            return { products: discountedProducts };
+        } catch (err) {
+            this.errorHandler.handleServiceError(
+                err,
+                "ProductsService.findAllProductsByStore"
+            );
+            throw err; // rethrow so higher layers know it failed
+        }
     }
-  }
 
-  /**
-   *
-   * @param businessId
-   * @param dto
-   * @returns
-   */
-  async createProductWithVariants(businessId: string, dto: CreateProductDto) {
-    const now = new Date();
-    const uploadedImageUrls: string[] = [];
+    /**
+     *
+     * @param businessId
+     * @param dto
+     * @returns
+     */
+    async createProductWithVariants(businessId: string, dto: CreateProductDto) {
+        const now = new Date();
+        const uploadedImageUrls: string[] = [];
 
-    try {
-      // 1. Check business exists
-      const business = await this.businessRepo.findOne({
-        where: { id: businessId },
-      });
-      if (!business) {
-        throw new NotFoundException(
-          'Cannot find a business with this business ID',
-        );
-      }
+        try {
+            // 1. Check business exists
+            const business = await this.businessRepo.findOne({
+                where: { id: businessId }
+            });
+            if (!business) {
+                throw new NotFoundException(
+                    "Cannot find a business with this business ID"
+                );
+            }
 
-      // 2. Check if product already exists
-      const existingProduct = await this.productRepo.findOne({
-        where: { name: dto.name },
-      });
-      if (existingProduct) {
-        throw new ConflictException(
-          'A product already exists with this credentials',
-        );
-      }
-      // 3. Check if variants provided exists
-      for (const variant of dto.variants) {
-        const existsingVariant = await this.variantRepo.findOne({
-          where: { sku: variant.sku },
-        });
-        if (existsingVariant) {
-          throw new ConflictException(`Variant with sku ${variant.sku}
+            // 2. Check if product already exists
+            const existingProduct = await this.productRepo.findOne({
+                where: { name: dto.name }
+            });
+            if (existingProduct) {
+                throw new ConflictException(
+                    "A product already exists with this credentials"
+                );
+            }
+            // 3. Check if variants provided exists
+            for (const variant of dto.product_variants) {
+                const existsingVariant = await this.variantRepo.findOne({
+                    where: { sku: variant.sku }
+                });
+                if (existsingVariant) {
+                    throw new ConflictException(`Variant with sku ${variant.sku}
                   already exists`);
+                }
+            }
+
+            // 4. Prepare product payload
+            const categoryId = await this.handleCategory(dto);
+            const path = `businesses/${
+                dto.business_name.split(" ")[0]
+            }/${uuidv4()}_${dto.thumbnail_file.originalname}`;
+            const thumbnailUrl = await this.fileService.uploadFile(
+                dto.thumbnail_file,
+                path,
+                "products"
+            );
+            uploadedImageUrls.push(thumbnailUrl);
+            const productData = {
+                id: uuidv4(),
+                business_id: businessId,
+                description: dto.description,
+                name: dto.name,
+                tags: dto.tags || [],
+                brand: dto.brand,
+                slug: generateSlug(dto.name),
+                thumbnail: thumbnailUrl,
+                category_id: categoryId,
+                category_type: dto.category,
+                created_at: now,
+                updated_at: now
+            };
+
+            // 5. Upload images + prepare variants
+            const variantsData = await Promise.all(
+                dto.product_variants.map(async variant => {
+                    const path = `businesses/${
+                        dto.business_name.split(" ")[0]
+                    }/${uuidv4()}_${variant.image_file.originalname}`;
+                    const imageUrl = await this.fileService.uploadFile(
+                        variant.image_file,
+                        path,
+                        "products"
+                    );
+                    uploadedImageUrls.push(imageUrl);
+
+                    return {
+                        id: uuidv4(),
+                        product_id: productData.id,
+                        name: variant.name,
+                        sku: variant.sku,
+                        price: variant.price,
+                        image_url: imageUrl,
+                        store_id: dto.store_id,
+                        business_id: businessId,
+                        created_at: now,
+                        updated_at: now
+                    };
+                })
+            );
+
+            // 6. Inventories
+            const variantInventories = variantsData.map((variant, index) => ({
+                id: uuidv4(),
+                business_id: businessId,
+                store_id: dto.store_id,
+                variant_id: variant.id,
+                total_quantity: dto.product_variants[index].inventory.quantity,
+                quantity: dto.product_variants[index].inventory.quantity,
+                reserved: dto.product_variants[index].inventory.reserved,
+                low_stock_quantity:
+                    dto.product_variants[index].inventory.low_stock_quantity,
+                created_at: now,
+                updated_at: now
+            }));
+            // 7. Transaction (product + variants + inventories )
+            return await this.dataSource.transaction(async manager => {
+                // Insert product
+                const product = manager.create(Product, productData);
+                const newProduct = await manager.save(Product, product);
+
+                // Insert variants
+                const variantEntities = manager.create(
+                    ProductVariant,
+                    variantsData
+                );
+
+                const newVariants = await manager.save(
+                    ProductVariant,
+                    variantEntities
+                );
+
+                // Insert inventories
+                const inventoryEntities = manager.create(
+                    StoreInventory,
+                    variantInventories
+                );
+                await manager.save(StoreInventory, inventoryEntities);
+
+                return { product: newProduct, variants: newVariants };
+            });
+        } catch (error) {
+            // Cleanup uploaded files if something failed
+            if (uploadedImageUrls.length > 0) {
+                for (const url of uploadedImageUrls) {
+                    try {
+                        const path = getPathFromUrl(url);
+                        await this.fileService.deleteFile(path, "products");
+                    } catch (cleanupErr) {
+                        console.error("Failed to cleanup file:", cleanupErr);
+                    }
+                }
+            }
+
+            // Re-throw handled error
+            this.errorHandler.handleServiceError(
+                error,
+                "createProductWithVariants"
+            );
+            throw error;
         }
-      }
+    }
 
-      // 4. Prepare product payload
-      const categoryId = await this.handleCategory(dto);
-      const path = `businesses/${dto.business_name.split(' ')[0]}/${uuidv4()}_${
-        dto.thumbnail.originalname
-      }`;
-      const thumbnailUrl = await this.fileService.uploadFile(
-        dto.thumbnail,
-        path,
-        'products',
-      );
-      uploadedImageUrls.push(thumbnailUrl);
-      const productData = {
-        id: uuidv4(),
-        business_id: businessId,
-        description: dto.description,
-        name: dto.name,
-        tags: dto.tags || [],
-        brand: dto.brand,
-        slug: generateSlug(dto.name),
-        thumbnail: thumbnailUrl,
-        category_id: categoryId,
-        category_type: dto.category,
-        created_at: now,
-        updated_at: now,
-      };
+    /**
+     * Main method: update product and variants
+     */
+    async updateProductWithVariants(
+        productId: string,
+        updateDto: UpdateProductDto,
+        storeId: string
+    ) {
+        const newFiles: string[] = []; // uploaded in this process
+        const oldFiles: string[] = []; // existing that should be deleted after success
 
-      // 5. Upload images + prepare variants
-      const variantsData = await Promise.all(
-        dto.variants.map(async (variant) => {
-          const path = `businesses/${dto.business_name.split(' ')[0]}/${uuidv4()}_${
-            variant.image_file.originalname
-          }`;
-          const imageUrl = await this.fileService.uploadFile(
-            variant.image_file,
+        try {
+            // Step 0: preload product & variants for old file tracking
+            const existingProduct = await this.productRepo.findOne({
+                where: {
+                    id: productId
+                },
+                relations: ["product_variants", "business"]
+            });
+
+            if (!existingProduct) {
+                throw new Error("Product not found");
+            }
+
+            // If a new thumbnail was provided → upload & track old
+            if (updateDto.thumbnail_file) {
+                if (existingProduct.thumbnail) {
+                    oldFiles.push(getPathFromUrl(existingProduct.thumbnail));
+                }
+
+                const uploadedThumb = await this.fileService.uploadFile(
+                    updateDto.thumbnail_file,
+                    `businesses/${
+                        existingProduct.business.name.split(" ")[0]
+                    }/${uuidv4()}_${updateDto.thumbnail_file.originalname}`,
+                    "products"
+                );
+                newFiles.push(getPathFromUrl(uploadedThumb));
+                updateDto.thumbnail = uploadedThumb;
+            }
+
+            // Preprocess variants: upload new images and track old ones
+            for (const variant of updateDto.product_variants) {
+                if (variant.image_file) {
+                    if (variant.id) {
+                        const existingVariant =
+                            existingProduct.product_variants.find(
+                                v => v.id === variant.id
+                            );
+                        if (existingVariant?.image_url) {
+                            oldFiles.push(
+                                getPathFromUrl(existingVariant.image_url)
+                            );
+                        }
+                    }
+
+                    const uploadedImg = await this.fileService.uploadFile(
+                        variant.image_file,
+                        `businesses/${
+                            existingProduct.business.name.split(" ")[0]
+                        }/${uuidv4()}_${variant.image_file.originalname}`,
+                        "products"
+                    );
+                    newFiles.push(getPathFromUrl(uploadedImg));
+                    variant.image_url = uploadedImg;
+                }
+            }
+
+            // Step 1 → run DB updates inside transaction
+            await this.dataSource.transaction(async manager => {
+                // Update product
+                const productPayload = {
+                    name: updateDto.name,
+                    brand: updateDto.brand,
+                    description: updateDto.description,
+                    tags: updateDto.tags || [],
+                    thumbnail: updateDto.thumbnail
+                };
+                await manager.update(Product, productId, productPayload);
+
+                // Update or create variants
+                for (const variant of updateDto.product_variants) {
+                    if (variant.id) {
+                        // Update variant
+                        const variantPayload = {
+                            name: variant.name,
+                            price: variant.price,
+                            image_url: variant.image_url
+                        };
+                        await manager.update(
+                            ProductVariant,
+                            variant.id,
+                            variantPayload
+                        );
+
+                        // Update inventory
+                        const inventoryPayload = {
+                            reserved: variant.inventory.reserved,
+                            low_stock_quantity:
+                                variant.inventory.low_stock_quantity
+                        };
+                        await manager.update(
+                            StoreInventory,
+                            { variant_id: variant.id, store_id: storeId },
+                            inventoryPayload
+                        );
+                    } else {
+                        // Create variant
+                        const createdVariant = manager.create(ProductVariant, {
+                            id: uuidv4(),
+                            name: variant.name,
+                            sku: variant.sku,
+                            price: variant.price,
+                            product_id: productId,
+                            business_id: updateDto.business_id,
+                            image_url: variant.image_url,
+                            store_id: storeId
+                        });
+                        const savedVariant = await manager.save(createdVariant);
+
+                        // Create inventory
+                        const inventory = manager.create(StoreInventory, {
+                            id: uuidv4(),
+                            variant_id: savedVariant.id,
+                            store_id: storeId,
+                            business_id: updateDto.business_id,
+                            quantity: variant.inventory?.quantity || 0,
+                            total_quantity: variant.inventory?.quantity || 0,
+                            reserved: variant.inventory?.reserved || 0,
+                            low_stock_quantity:
+                                variant.inventory?.low_stock_quantity || 0
+                        });
+                        await manager.save(inventory);
+                    }
+                }
+
+                // Handle removed variants
+                if (updateDto.removed_variant_ids?.length > 0) {
+                    for (const variantId of updateDto.removed_variant_ids) {
+                        const variant = existingProduct.product_variants.find(
+                            v => v.id === variantId
+                        );
+                        if (variant?.image_url) {
+                            oldFiles.push(getPathFromUrl(variant.image_url));
+                        }
+
+                        await manager.delete(StoreInventory, {
+                            variant_id: variantId,
+                            store_id: storeId
+                        });
+                        await manager.delete(ProductVariant, { id: variantId });
+                    }
+                }
+            });
+
+            // Step 2 → Transaction succeeded → cleanup old files
+            for (const oldPath of oldFiles) {
+                try {
+                    await this.fileService.deleteFile(oldPath, "products");
+                } catch (e) {
+                    // Log and continue, don't fail user update
+                    console.error("Failed to delete old file:", oldPath, e);
+                }
+            }
+
+            return { message: "Product and variants updated successfully" };
+        } catch (err) {
+            // Transaction failed → cleanup new uploads to avoid orphans
+            for (const newPath of newFiles) {
+                try {
+                    await this.fileService.deleteFile(newPath, "products");
+                } catch (e) {
+                    console.error(
+                        "Failed to cleanup uploaded file:",
+                        newPath,
+                        e
+                    );
+                }
+            }
+
+            this.errorHandler.handleServiceError(
+                err,
+                "updateProductWithVariants"
+            );
+        }
+    }
+    async deleteProductWithVariants(productId: string, businessId: string) {
+        return this.dataSource
+            .transaction(async manager => {
+                try {
+                    // 1. Fetch product with variants
+                    const product = await manager
+                        .getRepository(Product)
+                        .findOne({
+                            where: { id: productId, business_id: businessId },
+                            relations: ["product_variants"]
+                        });
+
+                    if (!product) {
+                        throw new NotFoundException("Product not found");
+                    }
+
+                    // 2. Collect image paths
+                    const imagePaths: string[] = [];
+                    if (product.thumbnail) {
+                        imagePaths.push(getPathFromUrl(product.thumbnail));
+                    }
+                    if (product.product_variants?.length) {
+                        for (const variant of product.product_variants) {
+                            if (variant.image_url) {
+                                imagePaths.push(
+                                    getPathFromUrl(variant.image_url)
+                                );
+                            }
+                        }
+                    }
+
+                    // 3. Delete product (cascade deletes variants + inventories)
+                    await manager.getRepository(Product).delete({
+                        id: productId,
+                        business_id: businessId
+                    });
+
+                    // Return paths for post-commit cleanup
+                    return { imagePaths };
+                } catch (err) {
+                    this.errorHandler.handleServiceError(
+                        err,
+                        "deleteProductWithVariants"
+                    );
+                    throw err; // rollback DB
+                }
+            })
+            .then(async ({ imagePaths }) => {
+                // 4. Attempt storage cleanup
+                if (imagePaths.length > 0) {
+                    const { error: storageError } = await this.supabase.storage
+                        .from("products")
+                        .remove(imagePaths);
+
+                    if (storageError) {
+                        // 5. If failed, enqueue for retry
+                        for (const path of imagePaths) {
+                            await this.dataSource
+                                .getRepository(FailedFileDeletion)
+                                .insert({
+                                    bucket_name: "products",
+                                    path,
+                                    error_message: storageError.message
+                                });
+                        }
+
+                        this.logger.error(
+                            `Queued ${imagePaths.length} files for retry due to storage deletion error: ${storageError.message}`
+                        );
+                    }
+                }
+
+                return {
+                    message: "Product and all related data deleted successfully"
+                };
+            });
+    }
+
+    private async handleCategory(dto: UpdateProductDto): Promise<string> {
+        const { data, error } = await this.supabase
+            .from("categories")
+            .select("id")
+            .eq("name", dto.category)
+            .maybeSingle();
+
+        if (error)
+            throw new BadRequestException(
+                "Supabase error fetching category: " + error.message
+            );
+        if (data) return data.id;
+
+        // Create new category
+        const { data: newCategory, error: insertError } = await this.supabase
+            .from("categories")
+            .insert([{ name: dto.category, store_id: dto.store_id }])
+            .select();
+
+        if (insertError)
+            throw new BadRequestException(
+                "Supabase error creating category: " + insertError.message
+            );
+
+        return newCategory[0].id;
+    }
+
+    private async handleThumbnail(
+        dto: any,
+        newThumbnail: Multer.File
+    ): Promise<string> {
+        if (dto.thumbnail) {
+            const prevPath = getPathFromUrl(dto.thumbnail);
+            await this.fileService.deleteFile(prevPath, "products");
+        }
+
+        const path = `variants/${dto.business_id}/${Date.now()}_${
+            newThumbnail.originalname
+        }`;
+        return await this.fileService.uploadFile(
+            newThumbnail,
             path,
-            'products',
-          );
-          uploadedImageUrls.push(imageUrl);
-
-          return {
-            id: uuidv4(),
-            product_id: productData.id,
-            name: variant.name,
-            sku: variant.sku,
-            price: variant.price,
-            image_url: imageUrl,
-            store_id: dto.store_id,
-            attributes: variant.attributes || [],
-            business_id: businessId,
-            created_at: now,
-            updated_at: now,
-          };
-        }),
-      );
-
-      // 6. Inventories
-      const variantInventories = variantsData.map((variant, index) => ({
-        id: uuidv4(),
-        business_id: businessId,
-        store_id: dto.store_id,
-        variant_id: variant.id,
-        total_quantity: dto.variants[index].quantity,
-        quantity: dto.variants[index].quantity,
-        reserved: dto.variants[index].reserved,
-        low_stock_threshold: dto.variants[index].low_stock_threshold,
-        created_at: now,
-        updated_at: now,
-      }));
-      // 7. Transaction (product + variants + inventories )
-      return await this.dataSource.transaction(async (manager) => {
-        // Insert product
-        const product = manager.create(Product, productData);
-        const newProduct = await manager.save(Product, product);
-
-        // Insert variants
-        const variantEntities = manager.create(ProductVariant, variantsData);
-
-        const newVariants = await manager.save(ProductVariant, variantEntities);
-
-        // Insert inventories
-        const inventoryEntities = manager.create(
-          StoreInventory,
-          variantInventories,
+            "products"
         );
-        await manager.save(StoreInventory, inventoryEntities);
-
-        return { product: newProduct, variants: newVariants };
-      });
-    } catch (error) {
-      // Cleanup uploaded files if something failed
-      if (uploadedImageUrls.length > 0) {
-        for (const url of uploadedImageUrls) {
-          try {
-            const path = getPathFromUrl(url);
-            await this.fileService.deleteFile(path, 'products');
-          } catch (cleanupErr) {
-            console.error('Failed to cleanup file:', cleanupErr);
-          }
-        }
-      }
-
-      // Re-throw handled error
-      this.errorHandler.handleServiceError(error, 'createProductWithVariants');
-      throw error;
     }
-  }
-
-  /**
-   * Main method: update product and variants
-   */
-  async updateProductWithVariants(
-    productId: string,
-    updateDto: UpdateProductDto,
-    storeId: string,
-  ) {
-    try {
-      // Step 1: Update product
-      await this.updateProduct(productId, updateDto);
-
-      // Step 2: Process variants (update, add, or remove)
-      for (const variant of updateDto.variants) {
-        if (variant.id) {
-          await this.updateVariantAndInventory(
-            variant,
-            storeId,
-            updateDto.business_id as string,
-          );
-        } else {
-          await this.createVariantAndInventory(
-            productId,
-            variant,
-            storeId,
-            updateDto.business_id as string,
-          );
-        }
-      }
-
-      // Step 3: Handle removed variants
-      if (updateDto.removedVariantIds?.length > 0) {
-        await this.removeVariants(updateDto.removedVariantIds, storeId);
-      }
-
-      return { message: 'Product and variants updated successfully' };
-    } catch (err) {
-      this.errorHandler.handleServiceError(err, 'updateProductWithVariants');
-    }
-  }
-
-  async deleteProductWithVariants(productId: string, businessId: string) {
-    try {
-      // 1. Fetch product and variants for cleanup
-      const { data: product, error: fetchError } = await this.supabase
-        .from('products')
-        .select(
-          `
-        id,
-        business_id,
-        thumbnail,
-        product_variants (
-          id,
-          image_url
-        )
-        `,
-        )
-        .eq('id', productId)
-        .eq('business_id', businessId)
-        .maybeSingle();
-
-      if (fetchError) throw new BadRequestException(fetchError.message);
-      if (!product) throw new NotFoundException('Product not found');
-
-      // 2. Collect image paths (thumbnail + variant images)
-      const imagePaths: string[] = [];
-      if (product.thumbnail) {
-        imagePaths.push(getPathFromUrl(product.thumbnail));
-      }
-      if (product.product_variants?.length) {
-        for (const variant of product.product_variants) {
-          if (variant.image_url) {
-            imagePaths.push(getPathFromUrl(variant.image_url));
-          }
-        }
-      }
-
-      // 3. Delete images from storage (if any)
-      if (imagePaths.length > 0) {
-        const { error: storageError } = await this.supabase.storage
-          .from('products')
-          .remove(imagePaths);
-
-        if (storageError) {
-          throw new BadRequestException(
-            `Failed to delete images: ${storageError.message}`,
-          );
-        }
-      }
-
-      // 4. Delete the product (cascade will handle variants + inventory)
-      const { error: deleteError } = await this.supabase
-        .from('products')
-        .delete()
-        .eq('id', productId)
-        .eq('business_id', businessId);
-
-      if (deleteError) throw new BadRequestException(deleteError.message);
-
-      return {
-        message: 'Product and all related data deleted successfully',
-      };
-    } catch (err) {
-      this.errorHandler.handleServiceError(err, 'deleteProductWithVariants');
-    }
-  }
-
-  /**
-   * Update product details
-   */
-  private async updateProduct(productId: string, dto: UpdateProductDto) {
-    // find category
-    const categoryId = await this.handleCategory(dto);
-
-    // update thumbnail
-    if (dto.thumbnail) {
-      dto.thumbnail = await this.handleThumbnail(dto, dto.thumbnail);
-    }
-
-    const { error } = await this.supabase
-      .from('products')
-      .update({
-        name: dto.name,
-        description: dto.description,
-        tags: dto.tags,
-        slug: generateSlug(dto.name),
-        category: dto.category,
-        thumbnail: dto.thumbnail,
-        categoryId,
-        brand: dto.brand,
-      })
-      .eq('id', productId);
-
-    if (error) throw new BadRequestException(error.message);
-  }
-
-  private async handleCategory(dto: UpdateProductDto): Promise<string> {
-    const { data, error } = await this.supabase
-      .from('categories')
-      .select('id')
-      .eq('name', dto.category)
-      .maybeSingle();
-
-    if (error)
-      throw new BadRequestException(
-        'Supabase error fetching category: ' + error.message,
-      );
-    if (data) return data.id;
-
-    // Create new category
-    const { data: newCategory, error: insertError } = await this.supabase
-      .from('categories')
-      .insert([{ name: dto.category, store_id: dto.store_id }])
-      .select();
-
-    if (insertError)
-      throw new BadRequestException(
-        'Supabase error creating category: ' + insertError.message,
-      );
-
-    return newCategory[0].id;
-  }
-
-  private async handleThumbnail(
-    dto: any,
-    newThumbnail: Multer.File,
-  ): Promise<string> {
-    if (dto.thumbnail) {
-      const prevPath = getPathFromUrl(dto.thumbnail);
-      await this.fileService.deleteFile(prevPath, 'products');
-    }
-
-    const path = `variants/${dto.business_id}/${Date.now()}_${
-      newThumbnail.originalname
-    }`;
-    return await this.fileService.uploadFile(newThumbnail, path, 'products');
-  }
-
-  /**
-   * Update an existing variant + inventory
-   */
-  private async updateVariantAndInventory(
-    variant: any,
-    storeId: string,
-    businessId: string,
-  ) {
-    // Check wants to change variant image
-    if (variant.image_file) {
-      // Delete previous image from storage
-      const previousPath = getPathFromUrl(variant.image_url);
-      await this.fileService.deleteFile(previousPath, 'products');
-
-      // Create new Image in storage
-      const newPath = `variants/${businessId}/${Date.now()}_${
-        variant.sku
-      }${variant.image_file.originalname}`;
-      const imageUrl = await this.fileService.uploadFile(
-        variant.image_file,
-        newPath,
-        'products',
-      );
-      variant.image_url = imageUrl;
-    }
-    const { error: variantError } = await this.supabase
-      .from('product_variants')
-      .update({
-        name: variant.name,
-        sku: variant.sku,
-        price: variant.price,
-        image_url: variant.image_url,
-        attributes: variant.attributes ?? {},
-      })
-      .eq('id', variant.id);
-
-    if (variantError) throw new BadRequestException(variantError.message);
-
-    const { error: inventoryError } = await this.supabase
-      .from('store_inventory')
-      .update({
-        low_stock_threshold: variant.inventory.low_stock_threshold,
-        reserved: variant.inventory.reserved,
-      })
-      .eq('variant_id', variant.id)
-      .eq('store_id', storeId);
-
-    if (inventoryError) throw new BadRequestException(inventoryError.message);
-  }
-
-  /**
-   * Create a new variant + inventory
-   */
-  private async createVariantAndInventory(
-    productId: string,
-    variant: any,
-    storeId: string,
-    businessId: string,
-  ) {
-    // Create new Image in storage
-    const path = `variants/${businessId}/${Date.now()}_${variant.sku}${
-      variant.image_file.originalname
-    }`;
-    const imageUrl = await this.fileService.uploadFile(
-      variant.image_file,
-      path,
-      'products',
-    );
-    variant.image_url = imageUrl;
-
-    const { data: newVariant, error: variantError } = await this.supabase
-      .from('product_variants')
-      .insert({
-        product_id: productId,
-        store_id: storeId,
-        business_id: businessId,
-        name: variant.name,
-        sku: variant.sku,
-        price: variant.price,
-        image_url: variant.image_url,
-        attributes: variant.attributes ?? [],
-      })
-      .select('id')
-      .maybeSingle();
-
-    if (variantError) throw new BadRequestException(variantError.message);
-
-    const { error: inventoryError } = await this.supabase
-      .from('store_inventory')
-      .insert({
-        store_id: storeId,
-        variant_id: newVariant?.id,
-        quantity: variant.inventory.quantity || 0,
-        low_stock_threshold: variant.inventory.low_stock_threshold,
-        reserved: variant.inventory.reserved,
-      });
-
-    if (inventoryError) throw new BadRequestException(inventoryError.message);
-  }
-
-  /**
-   * Remove variants (and inventory) by IDs
-   */
-  private async removeVariants(variantIds: string[], storeId: string) {
-    // First delete inventory records
-    const { error: inventoryError } = await this.supabase
-      .from('store_inventory')
-      .delete()
-      .in('variant_id', variantIds)
-      .eq('store_id', storeId);
-
-    if (inventoryError) throw new BadRequestException(inventoryError.message);
-
-    // Then delete variants
-    const { data: variants, error: variantError } = await this.supabase
-      .from('product_variants')
-      .delete()
-      .in('id', variantIds)
-      .select();
-
-    if (variantError) throw new BadRequestException(variantError.message);
-
-    // Loop through each variant and delete image from storage
-    for (const variant of variants) {
-      const path = getPathFromUrl(variant.image_url);
-      await this.fileService.deleteFile(path, 'products');
-    }
-  }
 }

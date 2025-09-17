@@ -12,6 +12,7 @@ import { ProductVariant } from '../../entities/product-variants.entity';
 import { Business } from '../../entities/business.entity';
 import { StoreInventory } from '../../entities/store-inventory.entity';
 import { Category } from 'src/entities/category.entity';
+import { FailedFileDeletion } from "../../entities/failed-file-deletion.entity";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { Category } from 'src/entities/category.entity';
       ProductVariant,
       Product,
       Category,
+      FailedFileDeletion
     ]),
   ],
   controllers: [ProductsController],
