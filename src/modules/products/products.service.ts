@@ -1,6 +1,7 @@
 import {
     Injectable,
     Inject,
+    Logger,
     BadRequestException,
     NotFoundException,
     ConflictException
@@ -28,6 +29,7 @@ import { Category } from "src/entities/category.entity";
 
 @Injectable()
 export class ProductsService {
+  private logger = new Logger(ProductsService.name)
     constructor(
         @Inject("SUPABASE_CLIENT") private readonly supabase: SupabaseClient,
         private readonly errorHandler: HandleErrorService,
