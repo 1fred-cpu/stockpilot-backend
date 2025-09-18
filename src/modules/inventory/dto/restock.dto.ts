@@ -39,9 +39,12 @@ export class RestockDto {
     @IsUUID()
     store_id: string;
 
+    @IsUUID()
+    business_id: string;
+
     @IsString()
     restocked_by: string;
-    
+
     @IsOptional()
     @IsString()
     idempotency_key: string;

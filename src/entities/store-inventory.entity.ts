@@ -29,16 +29,16 @@ export class StoreInventory {
     @Column({ type: "uuid", unique: true })
     variant_id: string;
 
-    @Column({ type: "numeric", default: 0 })
+    @Column({ type: "int", default: 0 })
     quantity: number;
 
-    @Column({ type: "numeric", default: 0 })
+    @Column({ type: "int", default: 0 })
     total_quantity: number;
 
-    @Column({ type: "numeric", default: 0 })
+    @Column({ type: "int", default: 0 })
     reserved: number;
 
-    @Column({ type: "numeric", default: 0 })
+    @Column({ type: "int", default: 0 })
     low_stock_quantity: number;
 
     @ManyToOne(() => Business, business => business.store_inventories, {
@@ -66,11 +66,8 @@ export class StoreInventory {
         inventory_log => inventory_log.store_inventory
     )
     inventory_logs: InventoryLog[];
-    
-    @OneToMany(
-        () => StockAlert,
-        stock_alert => stock_alert.store_inventory
-    )
+
+    @OneToMany(() => StockAlert, stock_alert => stock_alert.store_inventory)
     stock_alerts: StockAlert[];
 
     @CreateDateColumn({ type: "timestamptz" })

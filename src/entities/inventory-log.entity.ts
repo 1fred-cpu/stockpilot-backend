@@ -29,7 +29,7 @@ export class InventoryLog {
     @Column({ type: "uuid" })
     store_id: string;
 
-    @Column({ type: "uuid", unique: true })
+    @Column({ type: "uuid"})
     variant_id: string;
 
     @Column({ type: "numeric", default: 0 })
@@ -44,7 +44,7 @@ export class InventoryLog {
     @Column({ type: "text" })
     reference: string;
 
-    @Column({ type: "text", unique: true })
+    @Column({ type: "text" })
     idempotency_key: string;
 
     @Column({ type: "uuid" })
