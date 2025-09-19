@@ -47,6 +47,9 @@ export class ProductVariant {
     @Column({ type: "boolean", default: false })
     tracks_expiry: boolean;
 
+    @Column({ type: "text", nullable: true })
+    qrcode_url: string;
+
     @ManyToOne(() => Product, product => product.product_variants, {
         onDelete: "CASCADE"
     })
