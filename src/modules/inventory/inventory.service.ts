@@ -17,7 +17,8 @@ import { HandleErrorService } from "src/helpers/handle-error.helper";
 import { ProductVariant } from "../../entities/product-variants.entity";
 import { StoreInventory } from "../../entities/store-inventory.entity";
 import { InventoryLog } from "../../entities/inventory-log.entity";
-import { DataSource } from "typeorm";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, Repository } from "typeorm";
 
 @Injectable()
 export class InventoryService {
@@ -26,7 +27,9 @@ export class InventoryService {
         @Inject("SUPABASE_CLIENT") private readonly supabase: any,
         private readonly eventEmitterHelper: EventEmitterHelper,
         private readonly errorHandler: HandleErrorService,
-        private readonly dataSource: DataSource
+        private readonly dataSource: DataSource,
+        @InjectRepository(StoreInventory)
+        private readonly inventoryRepo: Repository<StoreInventory>
     ) {}
 
     /**
@@ -299,6 +302,48 @@ export class InventoryService {
             };
         } catch (error) {
             this.errorHandler.handleServiceError(error, "deductStock");
+        }
+    }
+    async getLowAndOutStocks(storeId: string) {
+        try {
+            // Get inventories with variant + product details
+            const inventories = await this.inventoryRepo.find({
+                where: { store_id: storeId },
+                relations: ["product_variant", "product_variant.product"] // join product + variant
+            });
+
+          
+
+            const items: any[] = [];
+
+            for (const inv of inventories) {
+                const quantity = inv.quantity ?? 0;
+                const lowStockThreshold = inv.low_stock_quantity ?? 0;
+
+                let status: string | null = null;
+                if (quantity === 0) {
+                    status = "Out of Stock";
+                } else if (quantity > 0 && quantity < lowStockThreshold) {
+                    status = "Low Stock";
+                }
+
+                if (status) {
+                    items.push({
+                        productId: inv.product_variant.product.id,
+                        productName: inv.product_variant.product.name,
+                        variantId: inv.product_variant.id,
+                        sku: inv.product_variant.sku,
+                        category: inv.product_variant.product.category_type,
+                        stock: quantity,
+                        lowStockThreshold: lowStockThreshold,
+                        status // new field
+                    });
+                }
+            }
+
+            return { items };
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "getLowAndOutStocks");
         }
     }
 

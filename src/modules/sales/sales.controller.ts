@@ -24,11 +24,11 @@ export class SalesController {
     }
 
     @Get("stores/:storeId")
-    async getSalesByDay(
+    async getDailySales(
         @Param("storeId", ParseUUIDPipe) storeId: string,
         @Query("date") date?: string
     ) {
-        return this.salesService.getSalesByDay(storeId, date);
+        return this.salesService.getDailySales(storeId, date);
     }
 
     @Get("analytics")

@@ -282,62 +282,62 @@ export class SalesService {
             );
         }
     }
-    async getSalesByDay(storeId: string, date?: string) {
-        try {
-            // Default to today if no date provided
-            const targetDate = date ? new Date(date) : new Date();
-
-            const startOfDay = new Date(targetDate);
-            startOfDay.setHours(0, 0, 0, 0);
-
-            const endOfDay = new Date(targetDate);
-            endOfDay.setHours(23, 59, 59, 999);
-
-            // Fetch sales with sale_items + product variants
-            const sales = await this.saleRepo.find({
-                where: {
-                    created_at: Between(startOfDay, endOfDay),
-                    store_id: storeId
-                },
-                relations: ["sale_items", "sale_items.product_variant"],
-                order: { created_at: "DESC" }
-            });
-
-            if (sales.length === 0) {
-                throw new NotFoundException(
-                    "No sales found for the selected day"
-                );
-            }
-
-            // 🔹 Aggregate data
-            const totalRevenue = sales.reduce(
-                (sum, sale) => sum + sale.total_amount,
-                0
-            );
-            const totalItemsSold = sales.reduce(
-                (sum, sale) =>
-                    sum +
-                    sale.sale_items.reduce(
-                        (iSum, item) => iSum + item.quantity,
-                        0
-                    ),
-                0
-            );
-            const averageSaleValue = totalRevenue / sales.length;
-
-            return {
-                date: startOfDay.toISOString().split("T")[0],
-                totalSales: sales.length,
-                totalRevenue,
-                totalItemsSold,
-                averageSaleValue,
-                sales
-            };
-        } catch (error: any) {
-            if (error instanceof NotFoundException) throw error;
-            this.errorHandler.handleServiceError(error, "getSalesByDay");
-        }
-    }
+    // async getSalesByDay(storeId: string, date?: string) {
+//         try {
+//             // Default to today if no date provided
+//             const targetDate = date ? new Date(date) : new Date();
+// 
+//             const startOfDay = new Date(targetDate);
+//             startOfDay.setHours(0, 0, 0, 0);
+// 
+//             const endOfDay = new Date(targetDate);
+//             endOfDay.setHours(23, 59, 59, 999);
+// 
+//             // Fetch sales with sale_items + product variants
+//             const sales = await this.saleRepo.find({
+//                 where: {
+//                     created_at: Between(startOfDay, endOfDay),
+//                     store_id: storeId
+//                 },
+//                 relations: ["sale_items", "sale_items.product_variant"],
+//                 order: { created_at: "DESC" }
+//             });
+// 
+//             if (sales.length === 0) {
+//                 throw new NotFoundException(
+//                     "No sales found for the selected day"
+//                 );
+//             }
+// 
+//             // 🔹 Aggregate data
+//             const totalRevenue = sales.reduce(
+//                 (sum, sale) => sum + sale.total_amount,
+//                 0
+//             );
+//             const totalItemsSold = sales.reduce(
+//                 (sum, sale) =>
+//                     sum +
+//                     sale.sale_items.reduce(
+//                         (iSum, item) => iSum + item.quantity,
+//                         0
+//                     ),
+//                 0
+//             );
+//             const averageSaleValue = totalRevenue / sales.length;
+// 
+//             return {
+//                 date: startOfDay.toISOString().split("T")[0],
+//                 totalSales: sales.length,
+//                 totalRevenue,
+//                 totalItemsSold,
+//                 averageSaleValue,
+//                 sales
+//             };
+//         } catch (error: any) {
+//             if (error instanceof NotFoundException) throw error;
+//             this.errorHandler.handleServiceError(error, "getSalesByDay");
+//         }
+//     }
 
     /**
      *
@@ -486,6 +486,60 @@ export class SalesService {
             deductions: results,
             idempotency_key: key
         };
+    }
+    async getDailySales(storeId: string, date?: string) {
+        try {
+            // 🔹 Default to today if no date provided
+            const targetDate = date ? new Date(date) : new Date();
+
+            // Normalize to start and end of the day
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date(targetDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            // 🔹 Fetch sales including sale items and product variants
+            const sales = await this.saleRepo.find({
+                where: {
+                    store_id: storeId,
+                    created_at: Between(startOfDay, endOfDay)
+                },
+                relations: ["sale_items", "sale_items.product_variant"],
+                order: { created_at: "ASC" }
+            });
+
+            // 🔹 Flatten all sale items
+            const saleItems = sales.flatMap(sale =>
+                sale.sale_items.map(item => ({
+                    sale_id: sale.id,
+                    created_at: sale.created_at,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    total_price: item.quantity * item.unit_price,
+                    product_variant: {
+                        id: item.product_variant?.id,
+                        sku: item.product_variant?.sku,
+                        name: item.product_variant?.name,
+                        image_url: item.product_variant.image_url
+                    }
+                }))
+            );
+
+            // 🔹 Calculate total sales amount
+            const totalAmount = saleItems.reduce(
+                (sum, item) => sum + item.total_price,
+                0
+            );
+
+            return {
+                date: startOfDay.toISOString().split("T")[0],
+                totalAmount,
+                saleItems
+            };
+        } catch (error) {
+            this.errorHandler.handleServiceError(error, "getDailySales");
+        }
     }
 
     private async handleCustomerTransactional(
