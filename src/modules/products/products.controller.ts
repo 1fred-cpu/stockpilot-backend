@@ -28,7 +28,7 @@ export class ProductsController {
   @Post(':businessId/products')
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'thumbnail', maxCount: 1 },
+      { name: 'thumbnail_file', maxCount: 1 },
       { name: 'variantImages', maxCount: 20 },
     ]),
   )
@@ -38,7 +38,7 @@ export class ProductsController {
     createProductDto: CreateProductDto,
     @UploadedFiles()
     files: {
-      thumbnail?: Multer.File[];
+      thumbnail_file?: Multer.File[];
       variantImages?: Multer.File[];
     },
   ) {
@@ -66,7 +66,7 @@ export class ProductsController {
         businessId,
         tags: parsedTags,
         product_variants: variantsWithImages,
-        thumbnail: files.thumbnail?.[0] ?? null,
+        thumbnail_file: files.thumbnail_file?.[0] ?? null,
       };
 
       // ✅ Call service
@@ -178,5 +178,17 @@ export class ProductsController {
     @Param('storeId', ParseUUIDPipe) storeId: string,
   ) {
     return this.productsService.findAllProductsByStore(storeId);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete(':businessId/products/:productId')
+  async deleteProduct(
+    @Param('businessId', ParseUUIDPipe) businessId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+  ) {
+    return this.productsService.deleteProductWithVariants(
+      productId,
+      businessId,
+    );
   }
 }

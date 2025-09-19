@@ -409,6 +409,19 @@ export class ProductsService {
     const oldFiles: string[] = []; // existing that should be deleted after success
 
     try {
+      // Check if any variant in updateDto already exists (by SKU) but with a different ID
+      for (const variant of updateDto.product_variants) {
+        if (variant.sku) {
+          const existing = await this.variantRepo.findOne({
+            where: { sku: variant.sku },
+          });
+          if (existing && (!variant.id || existing.id !== variant.id)) {
+            throw new ConflictException(
+              `Variant with sku ${variant.sku} already exists`,
+            );
+          }
+        }
+      }
       // Step 0: preload product & variants for old file tracking
       const existingProduct = await this.productRepo.findOne({
         where: {
@@ -555,11 +568,12 @@ export class ProductsService {
             if (variant?.image_url) {
               oldFiles.push(getPathFromUrl(variant.image_url));
             }
-
+            console.log('Removing variants:', updateDto.removed_variant_ids);
             await manager.delete(StoreInventory, {
               variant_id: variantId,
               store_id: storeId,
             });
+            console.log('deleted');
             await manager.delete(ProductVariant, { id: variantId });
           }
         }
