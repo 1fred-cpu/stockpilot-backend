@@ -456,14 +456,15 @@ export class AnalyticsService {
 
       const inventories = await this.inventoryRepo.find({
         where: { store_id: storeId },
-        select: ['quantity', 'product_variant'],
+
+        relations: ['product_variant', 'product_variant.product'],
       });
 
       if (inventories.length === 0) {
         return [];
       }
 
-      // Build a map of category stats
+      // Build a map of category statuss
       const categoryMap: Record<
         string,
         {
