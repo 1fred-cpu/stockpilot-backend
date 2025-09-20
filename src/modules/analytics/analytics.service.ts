@@ -667,7 +667,7 @@ export class AnalyticsService {
 
       const revenueChange =
         lastMonthRevenue === 0
-          ? 100
+          ? 0
           : ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
 
       // ------------------------------
@@ -689,7 +689,7 @@ export class AnalyticsService {
 
       const salesChange =
         lastWeekSales.length === 0
-          ? 100
+          ? 0
           : ((thisWeekSales.length - lastWeekSales.length) /
               lastWeekSales.length) *
             100;
@@ -713,7 +713,7 @@ export class AnalyticsService {
 
       const avgChange =
         lastAvgSaleValue === 0
-          ? 100
+          ? 0
           : ((avgSaleValue - lastAvgSaleValue) / lastAvgSaleValue) * 100;
 
       return {
