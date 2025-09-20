@@ -739,12 +739,12 @@ export class AnalyticsService {
     try {
       const now = new Date();
 
-      // 🔹 Calculate the start date (N weeks ago, from start of week)
+      // 🔹 Start date (N weeks ago)
       const startDate = new Date(now);
       startDate.setDate(now.getDate() - weeks * 7);
       startDate.setHours(0, 0, 0, 0);
 
-      // 🔹 Fetch sales within this period
+      // 🔹 Fetch sales
       const sales = await this.saleRepo.find({
         where: {
           store_id: storeId,
@@ -756,65 +756,61 @@ export class AnalyticsService {
         return [];
       }
 
-      // 🔹 Group sales by ISO week number
-      const weeklyData: Record<string, { revenue: number; count: number }> = {};
+      // 🔹 Group sales by week number
+      const weeklyData: Record<
+        string,
+        { revenue: number; days: Set<string>; month: string }
+      > = {};
 
       for (const sale of sales) {
         const date = new Date(sale.created_at);
 
-        // Compute ISO week & year
         const weekNumber = this.getISOWeek(date);
         const year = date.getFullYear();
         const weekKey = `${year}-W${weekNumber}`;
 
+        const monthKey = `${year}-${date.getMonth() + 1}`; // e.g., 2025-9
+
         if (!weeklyData[weekKey]) {
-          weeklyData[weekKey] = { revenue: 0, count: 0 };
-        }
-
-        weeklyData[weekKey].revenue += Number(sale.total_amount);
-        weeklyData[weekKey].count += 1;
-      }
-
-      // 🔹 Format into array sorted by week
-      const sortedTrend = Object.entries(weeklyData)
-        .map(([week, values]) => ({
-          week,
-          totalRevenue: values.revenue,
-          totalSales: values.count,
-        }))
-        .sort((a, b) => (a.week > b.week ? 1 : -1));
-
-      // 🔹 Calculate percentage change week-over-week
-      const trendWithChange = sortedTrend.map((item, index) => {
-        if (index === 0) {
-          return {
-            ...item,
-            revenueChange: null,
-            salesChange: null,
+          weeklyData[weekKey] = {
+            revenue: 0,
+            days: new Set(),
+            month: monthKey,
           };
         }
 
-        const prev = sortedTrend[index - 1];
+        weeklyData[weekKey].revenue += Number(sale.total_amount);
+        weeklyData[weekKey].days.add(date.toISOString().split('T')[0]);
+      }
 
-        const revenueChange =
-          prev.totalRevenue > 0
-            ? ((item.totalRevenue - prev.totalRevenue) / prev.totalRevenue) *
-              100
-            : null;
+      // 🔹 Track monthly totals per month
+      const monthTotals: Record<string, number> = {};
 
-        const salesChange =
-          prev.totalSales > 0
-            ? ((item.totalSales - prev.totalSales) / prev.totalSales) * 100
-            : null;
+      const trend = Object.entries(weeklyData)
+        .map(([week, values], index) => {
+          const weekly = values.revenue;
+          const daily =
+            values.days.size > 0 ? weekly / values.days.size : weekly;
 
-        return {
-          ...item,
-          revenueChange: revenueChange ? +revenueChange.toFixed(2) : null,
-          salesChange: salesChange ? +salesChange.toFixed(2) : null,
-        };
-      });
+          if (!monthTotals[values.month]) {
+            monthTotals[values.month] = 0;
+          }
+          monthTotals[values.month] += weekly;
 
-      return trendWithChange;
+          return {
+            date: `Week ${index + 1}`,
+            daily: Math.round(daily),
+            weekly: Math.round(weekly),
+            monthly: Math.round(monthTotals[values.month]),
+          };
+        })
+        .sort(
+          (a, b) =>
+            parseInt(a.date.replace('Week ', '')) -
+            parseInt(b.date.replace('Week ', '')),
+        );
+
+      return trend;
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getWeeklySalesTrend');
     }

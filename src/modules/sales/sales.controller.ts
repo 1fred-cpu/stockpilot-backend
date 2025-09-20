@@ -1,42 +1,41 @@
 import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Param,
-    Delete,
-    ValidationPipe,
-    Query,
-    ParseUUIDPipe
-} from "@nestjs/common";
-import { SalesService } from "./sales.service";
-import { CreateSaleDto } from "./dto/create-sale.dto";
-import { UpdateSaleDto } from "./dto/update-sale.dto";
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ValidationPipe,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { SalesService } from './sales.service';
+import { CreateSaleDto } from './dto/create-sale.dto';
 
-@Controller("sales")
+@Controller('sales')
 export class SalesController {
-    constructor(private readonly salesService: SalesService) {}
+  constructor(private readonly salesService: SalesService) {}
 
-    @Post()
-    async createSale(@Body(ValidationPipe) createSaleDto: CreateSaleDto) {
-        return this.salesService.createSale(createSaleDto);
-    }
+  @Post()
+  async createSale(@Body(ValidationPipe) createSaleDto: CreateSaleDto) {
+    return this.salesService.createSale(createSaleDto);
+  }
 
-    @Get("stores/:storeId")
-    async getDailySales(
-        @Param("storeId", ParseUUIDPipe) storeId: string,
-        @Query("date") date?: string
-    ) {
-        return this.salesService.getDailySales(storeId, date);
-    }
+  @Get('stores/:storeId')
+  async getDailySales(
+    @Param('storeId', ParseUUIDPipe) storeId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.salesService.getDailySales(storeId, date);
+  }
 
-    @Get("analytics")
-    async getSalesAnalytics(
-        @Query("storeId") storeId: string,
-        @Query("startDate") startDate?: string,
-        @Query("endDate") endDate?: string
-    ) {
-        return this.salesService.getAnalytics(storeId, startDate, endDate);
-    }
+  @Get('analytics')
+  async getSalesAnalytics(
+    @Query('storeId') storeId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.salesService.getAnalytics(storeId, startDate, endDate);
+  }
 }
