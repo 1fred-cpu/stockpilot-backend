@@ -6,9 +6,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { isValidUUID } from '../../utils/id-validator';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { v4 as uuid } from 'uuid';
+
 import { HandleErrorService } from '../../helpers/handle-error.helper';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Store } from 'src/entities/store.entity';
@@ -72,7 +70,7 @@ export class AnalyticsService {
       const currentSales = await this.saleRepo.find({
         select: ['total_amount'], // only fetch totalPrice
         where: {
-          id: storeId,
+          store_id: storeId,
           created_at: Between(new Date(currentMonthStart), now),
         },
       });
@@ -127,7 +125,6 @@ export class AnalyticsService {
           created_at: Between(new Date(lastMonthStart), new Date(lastMonthEnd)),
         },
       });
-      console.log(`lastProductsCurrentMonth: ${totalProducts}`);
 
       /** %Change */
       let percentageChangeProducts = 0;
@@ -245,15 +242,15 @@ export class AnalyticsService {
 
   async getTopSellingProducts(storeId: string) {
     try {
-      // Check if storeId exist with a store
       const store = await this.storeRepo.findOne({
         where: { id: storeId },
       });
 
-      if (!store)
+      if (!store) {
         throw new NotFoundException(
           'Cannot find a store with invalid store ID',
         );
+      }
 
       const today = new Date();
       const firstDayOfMonth = new Date(
@@ -262,47 +259,30 @@ export class AnalyticsService {
         1,
       );
 
-      // Fetch current month sales
-      const data = await this.saleItemRepo.find({
-        where: {
-          store_id: storeId,
-          created_at: Between(firstDayOfMonth, today),
-        },
-        select: ['product_variant', 'quantity', 'total_price', 'created_at'],
-        take: 5, // limit to 5 rows
-        order: {
-          created_at: 'DESC', // optional: latest 5
-        },
-      });
+      const data = await this.saleItemRepo
+        .createQueryBuilder('saleItem')
+        .leftJoin('saleItem.product_variant', 'variant')
+        .where('saleItem.store_id = :storeId', { storeId })
+        .andWhere('saleItem.created_at BETWEEN :start AND :end', {
+          start: firstDayOfMonth,
+          end: today,
+        })
+        .select('variant.name', 'productName')
+        .addSelect('variant.image_url', 'imageUrl')
+        .addSelect('SUM(saleItem.quantity)', 'totalSales')
+        .addSelect('SUM(saleItem.total_price)', 'totalRevenue')
+        .groupBy('variant.name')
+        .addGroupBy('variant.image_url')
+        .orderBy('SUM(saleItem.quantity)', 'DESC')
+        .limit(5)
+        .getRawMany();
 
-      if (data.length === 0) {
-        return [];
-      }
-
-      // Aggregate by product
-      const productMap: Record<
-        string,
-        { name: string; sales: number; revenue: number }
-      > = {};
-
-      for (const row of data) {
-        if (!productMap[row.product_variant.name]) {
-          productMap[row.product_variant.name] = {
-            name: row.product_variant.name,
-            sales: 0,
-            revenue: 0,
-          };
-        }
-        productMap[row.product_variant.name].sales += row.quantity;
-        productMap[row.product_variant.name].revenue += row.total_price;
-      }
-
-      // Sort by units sold (desc)
-      const result = Object.values(productMap).sort(
-        (a, b) => b.sales - a.sales,
-      );
-
-      return result;
+      return data.map((row) => ({
+        name: row.productName, // alias becomes lowercase in Postgres
+        image_url: row.imageUrl, // use lowercase alias here
+        sales: Number(row.totalSales),
+        revenue: Number(row.totalRevenue),
+      }));
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getTopSellingProducts');
     }
@@ -362,35 +342,35 @@ export class AnalyticsService {
   }
   async getLatestSales(storeId: string) {
     try {
-      // Check if storeId exist with a store
-      const store = await this.storeRepo.findOne({
-        where: { id: storeId },
-      });
-
-      if (!store)
+      const store = await this.storeRepo.findOne({ where: { id: storeId } });
+      if (!store) {
         throw new NotFoundException(
           'Cannot find a store with invalid store ID',
         );
-
-      const data = await this.saleItemRepo.find({
-        where: { store_id: storeId },
-        select: ['product_variant', 'unit_price', 'created_at', 'reference'],
-        take: 5,
-        order: {
-          created_at: 'DESC',
-        },
-      });
-
-      if (data.length === 0) {
-        return [];
       }
 
-      // Shape response
+      const data = await this.saleItemRepo
+        .createQueryBuilder('saleItem')
+        .leftJoin('saleItem.product_variant', 'variant')
+        .where('saleItem.store_id = :storeId', { storeId })
+        .orderBy('saleItem.created_at', 'DESC')
+        .take(5)
+        .select([
+          'saleItem.reference AS reference',
+          'saleItem.unit_price AS unit_price',
+          'saleItem.quantity AS quantity',
+          'saleItem.created_at AS created_at',
+          'variant.name AS product_name',
+        ])
+        .getRawMany();
+
+      if (data.length === 0) return [];
+
       return data.map((row) => ({
         saleId: row.reference,
-        product: row.product_variant.name,
+        product: row.product_name,
         amount: row.unit_price,
-        status: 'lowStock',
+        quantity: row.quantity,
       }));
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getLatestSales');

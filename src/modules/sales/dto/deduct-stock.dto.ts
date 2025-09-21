@@ -15,6 +15,9 @@ export class DeductStockItemDto {
   store_id: string;
 
   @IsUUID()
+  business_id: string;
+
+  @IsUUID()
   variant_id: string;
 
   @IsInt()

@@ -24,11 +24,11 @@ export class Customer {
   @Column({ type: 'text' })
   name: string;
 
-  @Column({ type: 'text', unique: true })
-  email: string;
+  @Column({ type: 'text', unique: true, nullable: true })
+  email: string | undefined;
 
-  @Column({ type: 'text', unique: true })
-  phone: string;
+  @Column({ type: 'text', unique: true, nullable: true })
+  phone: string | undefined;
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

@@ -184,9 +184,9 @@ export class SalesService {
           }
 
           if (item.quantity > existingItem.quantity) {
-            throw new BadRequestException(`Not enough stock for
-                      ${item.variant_id}
-                      `);
+            throw new BadRequestException(
+              `Not enough stock for ${item.variant_id}`,
+            );
           }
         }
 
@@ -210,6 +210,7 @@ export class SalesService {
             name: dto.customer.name,
             phone: dto.customer.phone,
             store_id: dto.store_id,
+            business_id: dto.business_id,
           });
         }
 
@@ -220,8 +221,14 @@ export class SalesService {
           total_amount: dto.total_amount,
           net_amount: dto.total_amount,
           payment_status: 'paid',
-          payment_method: dto.payment_method || 'cash',
+          payment_method: dto.payment_method || 'CASH',
           created_by: dto.created_by,
+          total_discount: dto.items.reduce(
+            (sum, item) => sum + (item.discount || 0),
+            0,
+          ),
+          reference: dto.reference || generateReference('SALE'),
+          idempotency_key: dto.idempotency_key || uuidv4(),
           customer_email: customerEntity?.email || null,
           customer_phone: customerEntity?.phone || null,
           customer_name: customerEntity?.name || null,
@@ -235,10 +242,13 @@ export class SalesService {
           const saleItem = manager.create(SaleItem, {
             sale_id: sale.id,
             variant_id: item.variant_id,
+            business_id: dto.business_id,
+            store_id: dto.store_id,
+            reference: dto.reference || generateReference('SALE'),
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount: item.discount || 0,
-            total_price: item.unit_price * item.quantity - (item.discount || 0),
+            total_price: item.unit_price * item.quantity,
           });
           await manager.save(saleItem);
 
@@ -247,7 +257,7 @@ export class SalesService {
             variant_id: item.variant_id,
             quantity: item.quantity,
             reason: 'sale',
-            reference: generateReference('SALE'),
+            reference: dto.reference || generateReference('SALE'),
             created_by: dto.created_by,
           });
         }
@@ -268,7 +278,7 @@ export class SalesService {
         throw error;
       }
       throw new InternalServerErrorException(
-        'Request failed. Please try agian later',
+        'Request failed. Please try again later',
       );
     }
   }
@@ -389,93 +399,99 @@ export class SalesService {
     if (error) throw new BadRequestException(error.message);
   }
   private async deductStockTransactional(manager: any, dto: DeductStockDto) {
-    const key = dto.idempotency_key || uuidv4();
+    try {
+      const key = dto.idempotency_key || uuidv4();
 
-    // Check if already processed
-    const existingLogs = await manager.find(InventoryLog, {
-      where: { idempotency_key: key },
-    });
-    if (existingLogs.length > 0) {
-      return {
-        message: 'Duplicate request ignored (idempotent)',
-        deductions: existingLogs.map((log) => ({
-          variant_id: log.variant_id,
-          deducted: log.change,
-          reason: log.reason,
-          created_at: log.created_at,
-        })),
-        idempotency_key: key,
-      };
-    }
+      // Check if already processed
+      const existingLogs = await manager.find(InventoryLog, {
+        where: { idempotency_key: key },
+      });
+      if (existingLogs.length > 0) {
+        return {
+          message: 'Duplicate request ignored (idempotent)',
+          deductions: existingLogs.map((log) => ({
+            variant_id: log.variant_id,
+            deducted: log.change,
+            reason: log.reason,
+            created_at: log.created_at,
+          })),
+          idempotency_key: key,
+        };
+      }
 
-    const results: any[] = [];
+      const results: any[] = [];
 
-    for (const deduction of dto.deductions) {
-      // 1. Get inventory row
-      const inventory = await manager.findOne(StoreInventory, {
-        where: {
+      for (const deduction of dto.deductions) {
+        // 1. Get inventory row
+        const inventory = await manager.findOne(StoreInventory, {
+          where: {
+            store_id: deduction.store_id,
+            variant_id: deduction.variant_id,
+          },
+        });
+
+        if (!inventory) {
+          throw new NotFoundException(
+            `Inventory not found for variant ${deduction.variant_id}`,
+          );
+        }
+
+        // 2. Check stock availability
+        if (inventory.quantity < deduction.quantity) {
+          throw new BadRequestException(
+            `Not enough stock for variant ${deduction.variant_id}`,
+          );
+        }
+
+        // 3. Update stock
+        inventory.quantity = inventory.quantity - deduction.quantity;
+        await manager.save(inventory);
+
+        // 4. Log deduction
+        const log = manager.create(InventoryLog, {
+          idempotency_key: key,
+          business_id: inventory.business_id,
+          inventory_id: inventory.id,
+          change: deduction.quantity,
+          type: 'deduct',
+          reference: deduction.reference,
+          created_by: deduction.created_by,
           store_id: deduction.store_id,
           variant_id: deduction.variant_id,
-        },
-      });
-
-      if (!inventory) {
-        throw new NotFoundException(
-          `Inventory not found for variant ${deduction.variant_id}`,
-        );
-      }
-
-      // 2. Check stock availability
-      if (inventory.quantity < deduction.quantity) {
-        throw new BadRequestException(
-          `Not enough stock for variant ${deduction.variant_id}`,
-        );
-      }
-
-      // 3. Update stock
-      inventory.quantity = inventory.quantity - deduction.quantity;
-      await manager.save(inventory);
-
-      // 4. Log deduction
-      const log = manager.create(InventoryLog, {
-        idempotency_key: key,
-        inventory_id: inventory.id,
-        change: deduction.quantity,
-        type: 'deduct',
-        reference: deduction.reference,
-        created_by: deduction.created_by,
-        store_id: deduction.store_id,
-        variant_id: deduction.variant_id,
-        reason: deduction.reason,
-      });
-      await manager.save(log);
-
-      // 5. Push result
-      results.push({
-        variant_id: deduction.variant_id,
-        deducted: deduction.quantity,
-        remaining: inventory.quantity,
-      });
-
-      // 6. Low stock alert (optional: save in `stock_alerts`)
-      if (inventory.quantity <= inventory.low_stock_threshold) {
-        const alert = manager.create(StockAlert, {
-          threshold: inventory.low_stock_threshold,
-          status: 'low stock',
-          triggered_at: new Date(),
-          inventory_id: inventory.id,
-          stock_at_trigger: inventory.quantity,
-          store_id: deduction.store_id,
+          reason: deduction.reason,
         });
-        await manager.save(alert);
-      }
-    }
+        await manager.save(log);
 
-    return {
-      message: 'Stock deducted successfully',
-      deductions: results,
-      idempotency_key: key,
-    };
+        // 5. Push result
+        results.push({
+          variant_id: deduction.variant_id,
+          deducted: deduction.quantity,
+          remaining: inventory.quantity,
+        });
+
+        // 6. Low stock alert (optional: save in `stock_alerts`)
+        if (inventory.quantity <= inventory.low_stock_threshold) {
+          const alert = manager.create(StockAlert, {
+            threshold: inventory.low_stock_threshold,
+            status: 'low stock',
+            triggered_at: new Date(),
+            inventory_id: inventory.id,
+            stock_at_trigger: inventory.quantity,
+            store_id: deduction.store_id,
+          });
+          await manager.save(alert);
+        }
+      }
+
+      return {
+        message: 'Stock deducted successfully',
+        deductions: results,
+        idempotency_key: key,
+      };
+    } catch (error) {
+      this.logger.error(`Error in deductStockTransactional: ${error.message}`);
+      throw error;
+    }
   }
   async getDailySales(storeId: string, date?: string) {
     try {
@@ -507,7 +523,9 @@ export class SalesService {
       const saleItems = sales.flatMap((sale) =>
         sale.sale_items.map((item) => ({
           sale_id: sale.id,
+          reference: item.reference,
           customer: sale.customer_name,
+          payment_method: sale.payment_method,
           created_at: sale.created_at,
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -542,6 +560,7 @@ export class SalesService {
     manager: EntityManager,
     customer: {
       store_id: string;
+      business_id: string;
       name?: string;
       email?: string;
       phone?: string;
@@ -565,6 +584,7 @@ export class SalesService {
       // Insert new
       const newCustomer = manager.create(Customer, {
         store_id: customer.store_id,
+        business_id: customer.business_id,
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
