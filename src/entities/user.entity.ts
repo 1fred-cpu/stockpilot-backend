@@ -47,7 +47,7 @@ export class User {
   updated_at: Date;
 
   // 👇 Relation: many users can belong to one store
-  @ManyToOne(() => Store, (store) => store.storeUsers, { onDelete: 'SET NULL' })
+  @ManyToOne(() => Store, (store) => store.users, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
   store: Store;
 
@@ -65,7 +65,7 @@ export class User {
   // 👇 Relation: one user can create multiple sales
   @OneToMany(() => Sale, (sale) => sale.user)
   sales: Sale[];
-  
+
   // 👇 Relation: one user can create multiple inventory logs
   @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.user)
   inventory_logs: InventoryLog[];

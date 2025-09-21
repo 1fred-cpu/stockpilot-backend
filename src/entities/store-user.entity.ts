@@ -38,8 +38,8 @@ export class StoreUser {
 
   @Column({ type: 'timestamptz' })
   assigned_at: Date;
-  
-  @Column({ type: 'boolean' , default:false})
+
+  @Column({ type: 'boolean', default: false })
   is_default: boolean;
 
   @CreateDateColumn({ type: 'timestamptz' })
@@ -49,7 +49,7 @@ export class StoreUser {
   updated_at: Date;
 
   // 👇 Relation: many users belong to one store
-  @ManyToOne(() => Store, (store) => store.storeUsers, {
+  @ManyToOne(() => Store, (store) => store.users, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'store_id' })

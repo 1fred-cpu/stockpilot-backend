@@ -18,6 +18,8 @@ import { Customer } from './customer.entity';
 import { SaleItem } from './sale-item.entity';
 import { StockAlert } from './stock-alert.entity';
 import { InventoryLog } from './inventory-log.entity';
+import { User } from './user.entity';
+import { Product } from './product.entity';
 
 @Entity('stores')
 export class Store {
@@ -50,12 +52,16 @@ export class Store {
   business: Business;
 
   // 👇 Relation: one store can have many store_users
-  @OneToMany(() => StoreUser, (storeUser) => storeUser.store)
-  storeUsers: StoreUser[];
+  @OneToMany(() => User, (user) => user.store)
+  users: User[];
 
   // 👇 Relation: one store can have many categories
   @OneToMany(() => Category, (category) => category.store)
   categories: Category[];
+
+  // 👇 Relation: one store can have many products
+  @OneToMany(() => Product, (product) => product.store)
+  products: Product[];
 
   // 👇 Relation: one store can have many product variants
   @OneToMany(() => ProductVariant, (product_variant) => product_variant.store)
@@ -76,11 +82,11 @@ export class Store {
   // 👇 Relation: one store can have many sale_items
   @OneToMany(() => SaleItem, (sale_item) => sale_item.store)
   sale_items: SaleItem[];
-  
+
   // 👇 Relation: one store can have many inventory_logs
   @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.store)
   inventory_logs: InventoryLog[];
-  
+
   // 👇 Relation: one store can have many stock_alerts
   @OneToMany(() => StockAlert, (stock_alert) => stock_alert.store)
   stock_alerts: StockAlert[];

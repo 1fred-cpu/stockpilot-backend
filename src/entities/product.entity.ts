@@ -11,6 +11,7 @@ import {
 import { Business } from './business.entity';
 import { Category } from './category.entity';
 import { ProductVariant } from './product-variants.entity';
+import { Store } from './store.entity';
 
 @Entity('products')
 export class Product {
@@ -19,6 +20,9 @@ export class Product {
 
   @Column({ type: 'uuid' })
   business_id: string;
+
+  @Column({ type: 'uuid' })
+  store_id: string;
 
   @Column({ type: 'text' })
   description: string;
@@ -58,6 +62,12 @@ export class Product {
   })
   @JoinColumn({ name: 'business_id', referencedColumnName: 'id' })
   business: Business;
+
+  @ManyToOne(() => Store, (store) => store.products, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
+  store: Store;
 
   @ManyToOne(() => Category, (category) => category.products, {
     onDelete: 'SET NULL',

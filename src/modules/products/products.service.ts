@@ -306,6 +306,7 @@ export class ProductsService {
       const productData = {
         id: uuidv4(),
         business_id: businessId,
+        store_id: dto.store_id,
         description: dto.description,
         name: dto.name,
         tags: dto.tags || [],

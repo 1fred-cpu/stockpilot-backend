@@ -27,7 +27,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Store } from 'src/entities/store.entity';
 import { Repository } from 'typeorm';
 import { Business } from 'src/entities/business.entity';
-
+import { SaleItem } from 'src/entities/sale-item.entity';
+import { Product } from 'src/entities/product.entity';
+import { StoreInventory } from 'src/entities/store-inventory.entity';
 @Injectable()
 export class StoresService {
   constructor(
@@ -36,8 +38,14 @@ export class StoresService {
     private readonly mailService: MailService,
     private readonly eventEmitterHelper: EventEmitterHelper,
     @InjectRepository(Store) private readonly storeRepo: Repository<Store>,
+    @InjectRepository(SaleItem)
+    private readonly saleItemRepo: Repository<SaleItem>,
     @InjectRepository(Business)
     private readonly businessRepo: Repository<Business>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+    @InjectRepository(StoreInventory)
+    private readonly storeInventoryRepo: Repository<StoreInventory>,
   ) {}
 
   /* CREATE STORE METHOD */
@@ -116,20 +124,75 @@ export class StoresService {
       const existingBusiness = await this.businessRepo.findOne({
         where: { id: businessId },
       });
+
       if (!existingBusiness) {
-        throw new NotFoundException('Business with this ID does not exists');
+        throw new NotFoundException('Business with this ID does not exist');
       }
 
-      // 2. Fetch stores by businessId
+      // 2. Fetch stores with relations
       const stores = await this.storeRepo.find({
         where: { business_id: businessId },
+        relations: ['users'], // include users (with role info)
       });
 
       if (stores.length === 0) {
         return [];
       }
 
-      return stores;
+      // Get today's date range
+      const today = new Date();
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+      // 3. For each store, aggregate today's sales, stock counts, and managers
+      const results = await Promise.all(
+        stores.map(async (store) => {
+          // ---- Get today's sales ----
+          const salesData = await this.saleItemRepo
+            .createQueryBuilder('saleItem')
+            .select('SUM(saleItem.total_price)', 'totalRevenue')
+            .addSelect('SUM(saleItem.quantity)', 'totalQuantity')
+            .where('saleItem.store_id = :storeId', { storeId: store.id })
+            .andWhere('saleItem.created_at BETWEEN :start AND :end', {
+              start: startOfDay,
+              end: endOfDay,
+            })
+            .getRawOne<{ totalRevenue: string; totalQuantity: string }>();
+
+          // ---- Get total products count (per store) ----
+          const totalProducts = await this.productRepo.count({
+            where: { business_id: businessId },
+          });
+
+          // ---- Get low stock products count (from store_inventory) ----
+          const lowStockProducts = await this.storeInventoryRepo
+            .createQueryBuilder('inventory')
+            .where('inventory.store_id = :storeId', { storeId: store.id })
+            .andWhere('inventory.quantity < :threshold', { threshold: 5 }) // threshold configurable
+            .getCount();
+
+          return {
+            ...store,
+            todays_sales: {
+              revenue: Number(salesData?.totalRevenue || 0),
+              quantity: Number(salesData?.totalQuantity || 0),
+            },
+            stock: {
+              total_products: totalProducts,
+              low_stock_count: lowStockProducts,
+            },
+            managers: store.users
+              .filter((user) => user.role === 'Admin')
+              .map((manager) => ({
+                id: manager.id,
+                name: manager.name,
+                email: manager.email,
+              })),
+          };
+        }),
+      );
+
+      return results;
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'findAllStores');
     }
