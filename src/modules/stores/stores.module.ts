@@ -14,6 +14,8 @@ import { SaleItem } from 'src/entities/sale-item.entity';
 import { Product } from 'src/entities/product.entity';
 import { ProductVariant } from 'src/entities/product-variants.entity';
 import { StoreInventory } from 'src/entities/store-inventory.entity';
+import { StoreUser } from 'src/entities/store-user.entity';
+import { User } from 'src/entities/user.entity';
 @Module({
   imports: [
     SupabaseModule,
@@ -24,6 +26,8 @@ import { StoreInventory } from 'src/entities/store-inventory.entity';
       SaleItem,
       Product,
       StoreInventory,
+      StoreUser,
+      User,
     ]),
   ],
   controllers: [StoresController],

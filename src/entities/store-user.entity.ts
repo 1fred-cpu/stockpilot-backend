@@ -49,7 +49,7 @@ export class StoreUser {
   updated_at: Date;
 
   // 👇 Relation: many users belong to one store
-  @ManyToOne(() => Store, (store) => store.users, {
+  @ManyToOne(() => Store, (store) => store.storeUsers, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'store_id' })

@@ -35,6 +35,15 @@ export class Store {
   @Column({ type: 'text' })
   location: string;
 
+  @Column({ type: 'text', nullable: true, default: null })
+  address: string | undefined;
+
+  @Column({ type: 'text', nullable: true, unique: true, default: null })
+  email: string | undefined;
+
+  @Column({ type: 'text', nullable: true, unique: true, default: null })
+  phone: string | undefined;
+
   @Column({ type: 'text' })
   currency: string;
 
@@ -51,9 +60,13 @@ export class Store {
   @JoinColumn({ name: 'business_id', referencedColumnName: 'id' }) // explicitly map FK → businesses.id
   business: Business;
 
-  // 👇 Relation: one store can have many store_users
+  // 👇 Relation: one store can have many users
   @OneToMany(() => User, (user) => user.store)
   users: User[];
+
+  // 👇 Relation: one store can have many store_users
+  @OneToMany(() => StoreUser, (store_user) => store_user.store)
+  storeUsers: StoreUser[];
 
   // 👇 Relation: one store can have many categories
   @OneToMany(() => Category, (category) => category.store)

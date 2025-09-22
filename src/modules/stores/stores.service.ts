@@ -21,15 +21,16 @@ import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
 import { MailService } from 'src/utils/mail/mail.service';
 import { SendInviteDto } from './dto/send-invite.dto';
 import { generateExpiry } from 'src/utils/expiry';
-import { User } from '../users/entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from 'src/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Store } from 'src/entities/store.entity';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Business } from 'src/entities/business.entity';
 import { SaleItem } from 'src/entities/sale-item.entity';
 import { Product } from 'src/entities/product.entity';
 import { StoreInventory } from 'src/entities/store-inventory.entity';
+import { StoreUser } from 'src/entities/store-user.entity';
 @Injectable()
 export class StoresService {
   constructor(
@@ -46,6 +47,11 @@ export class StoresService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(StoreInventory)
     private readonly storeInventoryRepo: Repository<StoreInventory>,
+    @InjectRepository(StoreUser)
+    private readonly storeUserRepo: Repository<StoreUser>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /* CREATE STORE METHOD */
@@ -56,44 +62,54 @@ export class StoresService {
    */
   async createStore(dto: CreateStoreDto) {
     try {
-      // Check if store with same name and business_id exists for the business
-      if (
-        await this.doStoreExists(dto.business_id, dto.store_name, dto.location)
-      ) {
-        throw new ConflictException(
-          'Store with this business ID, name and location already exists',
-        );
-      }
+      return await this.dataSource.transaction(async (manager) => {
+        // Check if store with same name and business_id exists for the business
+        const existingStore = await this.storeRepo.findOne({
+          where: { name: dto.store_name, business_id: dto.business_id },
+        });
+        if (existingStore) {
+          throw new ConflictException(
+            'Store with this business ID and name already exists',
+          );
+        }
 
-      // Define a store data
-      const store = {
-        id: uuidv4(),
-        business_id: dto.business_id,
-        name: dto.store_name,
-        timezone: dto.timezone,
-        currency: dto.currency,
-        location: dto.location,
-        created_at: new Date().toISOString(),
-      };
+        // Create a store data
+        const storeData = manager.create(Store, {
+          id: uuidv4(),
+          business_id: dto.business_id,
+          name: dto.store_name,
+          address: dto.address,
+          email: dto.email,
+          phone: dto.phone,
+          currency: dto.currency,
+          location: dto.location,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
-      // Insert into Supabase
-      const { error: createError } = await this.supabase
-        .from('stores')
-        .insert([store]);
+        const newStore = await manager.save(Store, storeData);
 
-      if (createError) {
-        throw new BadRequestException(createError.message);
-      }
+        // Fetch owner details
+        const owner = await this.userRepo.findOne({
+          where: { id: dto.owner_id },
+        });
 
-      // // Emit Kafka event
-      // await this.kafkaHelper.emitEvent(
-      //   'store.events',
-      //   store.business_id,
-      //   'StoreCreated',
-      //   store,
-      // );
+        // Assigned store owner in store
+        const storeOwnerAssigned = manager.create(StoreUser, {
+          id: uuidv4(),
+          store_id: newStore.id,
+          user_id: dto.owner_id,
+          business_id: dto.business_id,
+          email: owner?.email,
+          role: 'Admin',
+          status: 'active',
+          assigned_at: new Date(),
+        });
 
-      return store;
+        await manager.save(StoreUser, storeOwnerAssigned);
+
+        return newStore;
+      });
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'createStore');
     }
@@ -102,9 +118,12 @@ export class StoresService {
   /**  FIND A STORE METHOD */
   async findStore(storeId: string) {
     try {
-      const store = await this.getStore(storeId);
+      const store = await this.storeRepo.findOne({
+        where: { id: storeId },
+        relations: ['storeUsers'],
+      });
       if (!store) {
-        throw new NotFoundException("Can't find a store with this store ID");
+        throw new NotFoundException('Cannot find store');
       }
       return store;
     } catch (error) {
@@ -161,7 +180,7 @@ export class StoresService {
 
           // ---- Get total products count (per store) ----
           const totalProducts = await this.productRepo.count({
-            where: { business_id: businessId },
+            where: { store_id: store.id },
           });
 
           // ---- Get low stock products count (from store_inventory) ----
