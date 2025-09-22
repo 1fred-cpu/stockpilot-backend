@@ -1,22 +1,42 @@
-// dto/invite-user.dto.ts
-import { IsEmail, IsString, IsUUID } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 
 export class InviteUserDto {
+  @IsUUID()
+  @IsNotEmpty()
+  invite_id: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  business_id: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  store_id: string;
+
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
   @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsString()
-  role: string; // cashier, manager, etc.
-
-  @IsString()
+  @MinLength(6)
   password: string;
 
-  @IsUUID()
-  business_id: string;
-  
-  @IsUUID()
-  invite_id: string;
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @IsString()
+  @IsOptional()
+  invited_by?: string;
 }

@@ -20,6 +20,7 @@ import { StockAlert } from './stock-alert.entity';
 import { InventoryLog } from './inventory-log.entity';
 import { User } from './user.entity';
 import { Product } from './product.entity';
+import { Invite } from './invite.entity';
 
 @Entity('stores')
 export class Store {
@@ -103,4 +104,8 @@ export class Store {
   // 👇 Relation: one store can have many stock_alerts
   @OneToMany(() => StockAlert, (stock_alert) => stock_alert.store)
   stock_alerts: StockAlert[];
+  
+  // 👇 Relation: one store can have many invites
+  @OneToMany(() => Invite, (invite) => invite.store)
+  invites: Invite[];
 }

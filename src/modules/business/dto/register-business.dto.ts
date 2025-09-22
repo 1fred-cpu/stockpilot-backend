@@ -1,50 +1,55 @@
 // dto/register-business.dto.ts
 import {
-  IsString,
-  IsObject,
-  IsEmail,
-  IsPhoneNumber,
-  IsOptional,
-  IsNotEmpty,
-} from 'class-validator';
-import { Multer } from 'multer';
+    IsString,
+    IsObject,
+    IsEmail,
+    IsPhoneNumber,
+    IsOptional,
+    IsNotEmpty
+} from "class-validator";
+import { Multer } from "multer";
 
 export class RegisterBusinessDto {
-  @IsString()
-  @IsNotEmpty()
-  owner_user_id: string; // ID of the user who signed up
+    @IsString()
+    @IsNotEmpty()
+    owner_user_id: string; // ID of the user who signed up
 
-  @IsString()
-  @IsNotEmpty()
-  business_name: string;
+    @IsString()
+    @IsNotEmpty()
+    business_name: string;
 
-  @IsString()
-  @IsNotEmpty()
-  store_name: string;
+    @IsPhoneNumber()
+    business_phone: string;
 
-  @IsString()
-  @IsNotEmpty()
-  currency: string;
+    @IsEmail()
+    business_email: string;
 
-  @IsString()
-  @IsNotEmpty()
-  location: string;
+    @IsString()
+    @IsNotEmpty()
+    store_name: string;
 
-  @IsString()
-  @IsNotEmpty()
-  owner_name: string;
+    @IsString()
+    @IsNotEmpty()
+    currency: string;
 
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
+    @IsString()
+    @IsNotEmpty()
+    location: string;
 
-  @IsPhoneNumber()
-  phone: string;
+    @IsString()
+    @IsNotEmpty()
+    address: string;
 
-  @IsOptional()
-  @IsString()
-  website?: string;
+    @IsEmail()
+    store_email: string;
 
-  @IsOptional()
-  image_file: Multer.File;
+    @IsPhoneNumber()
+    store_phone: string;
+
+    @IsOptional()
+    @IsString()
+    website?: string;
+
+    @IsOptional()
+    image_file?: Multer.File;
 }

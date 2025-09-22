@@ -18,6 +18,7 @@ import { Customer } from "./customer.entity";
 import { SaleItem } from "./sale-item.entity";
 import { InventoryLog } from "./inventory-log.entity";
 import { StockAlert } from "./stock-alert.entity";
+import { Invite } from "./invite.entity";
 
 @Entity("businesses")
 export class Business {
@@ -100,8 +101,12 @@ export class Business {
     // 👇 Relation: one business can have many inventory_logs
     @OneToMany(() => InventoryLog, inventory_log => inventory_log.business)
     inventory_logs: InventoryLog[];
-    
+
     // 👇 Relation: one business can have many stock_alerts
     @OneToMany(() => StockAlert, stock_alert => stock_alert.business)
     stock_alerts: StockAlert[];
+    
+    // 👇 Relation: one business can have many invites
+    @OneToMany(() => Invite, invite => invite.business)
+    invites: Invite[];
 }

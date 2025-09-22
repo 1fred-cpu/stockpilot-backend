@@ -22,6 +22,8 @@ import { InviteUserDto } from "./dto/invite-user.dto";
 import { Multer } from "multer";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateStoreUsersDto } from "./dto/update-store-users.dto";
+
 @Controller("stores")
 export class StoresController {
     constructor(private readonly storesService: StoresService) {}
@@ -29,7 +31,7 @@ export class StoresController {
     /**
      * Create a store
      * @param createStoreDto
-     * @returns Store
+     * @returns Store object
      */
     @HttpCode(HttpStatus.CREATED)
     @Post()
@@ -159,6 +161,18 @@ export class StoresController {
         @Body(ValidationPipe) dto: UpdateStoreDto
     ) {
         return this.storesService.updateStore(storeId, dto);
+    }
+    /**
+     *  Update store users
+     * @param storeId
+     */
+    @HttpCode(HttpStatus.OK)
+    @Patch(":storeId/users")
+    async updateStoreUsers(
+        @Param("storeId", ParseUUIDPipe) storeId: string,
+        @Body(ValidationPipe) dto: UpdateStoreUsersDto
+    ) {
+        return this.storesService.updateStoreUsers(storeId, dto);
     }
 
     /**
