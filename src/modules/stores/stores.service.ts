@@ -195,7 +195,7 @@ export class StoresService {
         throw new NotFoundException('Cannot find store');
       }
       // Enhance: Add total users and roles summary
-      const users = store.storeUsers.map((u) => ({
+      const users = store.store_users.map((u) => ({
         id: u.user.id,
         name: u.user.name,
         email: u.user.email,
@@ -249,7 +249,7 @@ export class StoresService {
       // 2. Fetch stores with relations
       const stores = await this.storeRepo.find({
         where: { business_id: businessId },
-        relations: ['storeUsers', 'storeUsers.user'], // include users (with role info)
+        relations: ['store_users', 'store_users.user'], // include users (with role info)
       });
 
       if (stores.length === 0) {
@@ -299,6 +299,13 @@ export class StoresService {
 
           return {
             ...store,
+            store_users: store.store_users.map((u) => ({
+              id: u.user.id,
+              name: u.user.name,
+              email: u.user.email,
+              role: u.role,
+              status: u.status,
+            })),
             todays_sales: {
               revenue: Number(salesData?.totalRevenue || 0),
               quantity: Number(salesData?.totalQuantity || 0),
@@ -307,10 +314,10 @@ export class StoresService {
               total_products: totalProducts,
               low_stock_count: lowStockProducts,
             },
-            managers: store.storeUsers
+            managers: store.store_users
               .filter((user) => user.role === 'Owner' || 'Admin')
               .map((manager) => ({
-                id: manager.id,
+                id: manager.user.id,
                 name: manager.user.name,
                 email: manager.email,
               })),
@@ -688,7 +695,7 @@ export class StoresService {
         // 1. Ensure store exists with related users
         const store = await manager.findOne(Store, {
           where: { id: storeId },
-          relations: ['storeUsers', 'storeUsers.user'], // load store-users mapping
+          relations: ['store_users', 'store_users.user'], // load store-users mapping
         });
 
         if (!store) {
@@ -696,8 +703,8 @@ export class StoresService {
         }
 
         // 2. Handle users in this store
-        if (store.storeUsers?.length) {
-          for (const storeUser of store.storeUsers) {
+        if (store.store_users?.length) {
+          for (const storeUser of store.store_users) {
             const user = storeUser.user;
 
             // Remove this store-user link

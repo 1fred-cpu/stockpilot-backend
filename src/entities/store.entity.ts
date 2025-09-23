@@ -67,7 +67,7 @@ export class Store {
 
   // 👇 Relation: one store can have many store_users
   @OneToMany(() => StoreUser, (store_user) => store_user.store)
-  storeUsers: StoreUser[];
+  store_users: StoreUser[];
 
   // 👇 Relation: one store can have many categories
   @OneToMany(() => Category, (category) => category.store)
@@ -104,7 +104,7 @@ export class Store {
   // 👇 Relation: one store can have many stock_alerts
   @OneToMany(() => StockAlert, (stock_alert) => stock_alert.store)
   stock_alerts: StockAlert[];
-  
+
   // 👇 Relation: one store can have many invites
   @OneToMany(() => Invite, (invite) => invite.store)
   invites: Invite[];
