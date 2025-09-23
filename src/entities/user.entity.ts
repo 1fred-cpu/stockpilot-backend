@@ -34,8 +34,8 @@ export class User {
   @Column({ type: 'text', default: 'active' })
   status: string; // e.g. "active", "inactive", "suspended"
 
-  @Column({ type: 'text', nullable: true })
-  role: string | null;
+  // @Column({ type: 'text', nullable: true })
+  // role: string | null;
 
   @Column({ type: 'text', nullable: true })
   auth_provider: string | null;
@@ -59,8 +59,8 @@ export class User {
   business: Business;
 
   // 👇 Relation: one user can appear in many store_users (assignments)
-  @OneToMany(() => StoreUser, (storeUser) => storeUser.user)
-  storeUsers: StoreUser[];
+  @OneToMany(() => StoreUser, (store_users) => store_users.user)
+  store_users: StoreUser[];
 
   // 👇 Relation: one user can create multiple sales
   @OneToMany(() => Sale, (sale) => sale.user)

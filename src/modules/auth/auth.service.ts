@@ -28,7 +28,8 @@ export class AuthService {
       // 1. Fetch user
       const user = await this.userRepo.findOne({
         where: { email },
-        select: ['id', 'name', 'email', 'role', 'business_id', 'store_id'],
+        select: ['id', 'name', 'email', 'business_id', 'store_id'],
+        relations: ['store_users'],
       });
 
       if (!user) {
@@ -36,7 +37,11 @@ export class AuthService {
       }
 
       // 2. Handle setup states
-      if (user.role === 'Admin' && !user.business_id && !user.store_id) {
+      if (
+        user.store_users[0]?.role === 'admin' &&
+        !user.business_id &&
+        !user.store_id
+      ) {
         return {
           status: 'PENDING_SETUP',
           message: 'Business setup is required',
@@ -45,14 +50,17 @@ export class AuthService {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            role: user.store_users[0]?.role,
           },
           stores: [],
           active_store: null,
         };
       }
 
-      if (user.role !== 'Admin' && (!user.business_id || !user.store_id)) {
+      if (
+        user.store_users[0]?.role !== 'admin' &&
+        (!user.business_id || !user.store_id)
+      ) {
         return {
           status: 'PENDING_ASSIGNMENT',
           message:
@@ -62,7 +70,7 @@ export class AuthService {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
+            role: user.store_users[0]?.role,
           },
           stores: [],
           active_store: null,
@@ -72,7 +80,7 @@ export class AuthService {
       // 3. If user is properly linked → fetch stores
       let stores: any[] = [];
 
-      if (user.role === 'Admin') {
+      if (user.store_users[0]?.role === 'admin') {
         // Admin → all stores under their business
         const allStores = await this.storeRepo.find({
           where: { business: { id: user.business_id as string } },

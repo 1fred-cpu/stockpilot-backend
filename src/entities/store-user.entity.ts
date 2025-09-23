@@ -63,7 +63,7 @@ export class StoreUser {
   business: Business;
 
   // 👇 Relation: many store_users point to one user
-  @ManyToOne(() => User, (user) => user.storeUsers, {
+  @ManyToOne(() => User, (user) => user.store_users, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
