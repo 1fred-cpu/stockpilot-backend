@@ -14,6 +14,7 @@ import { StockAlert } from 'src/entities/stock-alert.entity';
 import { Refund } from 'src/entities/refund.entity';
 import { ReturnItem } from 'src/entities/return-item.entity';
 import { FailedFileDeletion } from '../entities/failed-file-deletion.entity';
+import { Invite } from 'src/entities/invite.entity';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { FailedFileDeletion } from '../entities/failed-file-deletion.entity';
           Refund,
           ReturnItem,
           FailedFileDeletion,
+          Invite,
         ],
       }),
     }),

@@ -18,7 +18,7 @@ export class StoreUser {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true, default: null })
   store_id: string;
 
   @Column({ type: 'uuid' })

@@ -16,6 +16,7 @@ import { ProductVariant } from 'src/entities/product-variants.entity';
 import { StoreInventory } from 'src/entities/store-inventory.entity';
 import { StoreUser } from 'src/entities/store-user.entity';
 import { User } from 'src/entities/user.entity';
+import { JwtHelper } from 'src/helpers/jwt.helper';
 @Module({
   imports: [
     SupabaseModule,
@@ -37,6 +38,7 @@ import { User } from 'src/entities/user.entity';
     HandleErrorService,
     UserEventsListener,
     EventEmitterHelper,
+    JwtHelper,
   ],
 })
 export class StoresModule {}
