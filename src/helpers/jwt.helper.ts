@@ -14,7 +14,7 @@ export class JwtHelper {
    */
   async generateToken(
     payload: any,
-    expiresIn: string | number = '1h',
+    expiresIn: string  = '1h',
   ): Promise<string> {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) {

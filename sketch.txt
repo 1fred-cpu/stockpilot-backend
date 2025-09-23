@@ -122,3 +122,5 @@ active → has business & store.
 invited → invited by another business but not activated yet.
 
 This way, you can branch logic on login.
+
+http://localhost:3000/accept-invite?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpbnZpdGVfaWQiOiJhZDRiMDlmYi02YWNkLTRkNWUtYWUyYi1kZGMwMWQ4NDNkNWIiLCJpYXQiOjE3NTg2MjQwMTgsImV4cCI6MTc1ODc5NjgxOH0.St-yrRIF5mU-wA8OCdVCBfOdRiePTLPBJTlKD-ncKWQ

@@ -20,7 +20,8 @@ export class HandleErrorService {
       error instanceof ConflictException ||
       error instanceof UnauthorizedException ||
       error instanceof InternalServerErrorException ||
-      error instanceof HttpException
+      error instanceof HttpException||
+      error instanceof Error 
     ) {
       throw error;
     }

@@ -26,10 +26,11 @@ export class MailService {
             });
 
             console.log(`✅ Email sent: ${info.messageId}`);
-            return info;
+            return { data: info, error: null };
         } catch (error) {
+            
             console.error(`❌ Error sending email:`, error);
-            throw error;
+            return { error, data: null };
         }
     }
 }
