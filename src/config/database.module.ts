@@ -12,7 +12,7 @@ import { StoreInventory } from 'src/entities/store-inventory.entity';
 import { InventoryLog } from 'src/entities/inventory-log.entity';
 import { StockAlert } from 'src/entities/stock-alert.entity';
 import { Refund } from 'src/entities/refund.entity';
-import { ReturnItem } from 'src/entities/return-item.entity';
+import { ReturnItem } from 'src/entities/return.entity';
 import { FailedFileDeletion } from '../entities/failed-file-deletion.entity';
 import { Invite } from 'src/entities/invite.entity';
 
