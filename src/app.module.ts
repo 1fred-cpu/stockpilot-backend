@@ -23,6 +23,7 @@ import { SchedulesServiceModule } from "./schedules/schedule.module";
 import { MigrationService } from "./migration/migration.service";
 import { AuthModule } from "./modules/auth/auth.module";
 import { QrcodeModule } from "./modules/qrcode/qrcode.module";
+import { ReturnsModule } from "./modules/returns/returns.module.";
 @Module({
     imports: [
         // Load environment variables from .env file
@@ -59,7 +60,8 @@ import { QrcodeModule } from "./modules/qrcode/qrcode.module";
         BillingModule,
         DiscountsModule,
         AuthModule,
-        QrcodeModule
+        QrcodeModule,
+        ReturnsModule
     ],
     controllers: [AppController],
     providers: [
