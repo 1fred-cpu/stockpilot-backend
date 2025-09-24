@@ -38,7 +38,7 @@ export class AuthService {
 
       // 2. Handle setup states
       if (
-        user.store_users[0]?.role === 'admin' &&
+        user.store_users[0]?.role === 'owner' &&
         !user.business_id &&
         !user.store_id
       ) {
@@ -58,13 +58,13 @@ export class AuthService {
       }
 
       if (
-        user.store_users[0]?.role !== 'admin' &&
+        user.store_users[0]?.role !== 'owner' &&
         (!user.business_id || !user.store_id)
       ) {
         return {
           status: 'PENDING_ASSIGNMENT',
           message:
-            'You are not yet assigned to any store. Please contact your admin.',
+            'You are not yet assigned to any store. Please contact your owner.',
           nextStep: 'WAIT_FOR_ASSIGNMENT',
           user: {
             id: user.id,
@@ -80,7 +80,7 @@ export class AuthService {
       // 3. If user is properly linked → fetch stores
       let stores: any[] = [];
 
-      if (user.store_users[0]?.role === 'admin') {
+      if (user.store_users[0]?.role === 'owner') {
         // Admin → all stores under their business
         const allStores = await this.storeRepo.find({
           where: { business: { id: user.business_id as string } },
@@ -208,7 +208,7 @@ export class AuthService {
         name: dto.name,
         email: dto.email,
         store_id: null,
-        role: 'Admin',
+        role: 'owner',
         business_id: null,
         status: 'pending_setup',
         auth_provider: 'google', // track provider
