@@ -2,30 +2,81 @@ import {
     Entity,
     PrimaryGeneratedColumn,
     Column,
+    CreateDateColumn,
+    UpdateDateColumn,
     ManyToOne,
-    JoinColumn,
-    CreateDateColumn
+    JoinColumn
 } from "typeorm";
+import { Sale } from "./sale.entity";
 import { SaleItem } from "./sale-item.entity";
+import { StoreCredit } from "./store-credit.entity";
 
-@Entity("return_items")
-export class ReturnItem {
+export enum ReturnResolution {
+    REFUND = "refund",
+    EXCHANGE = "exchange",
+    STORE_CREDIT = "store_credit"
+}
+
+export enum ReturnStatus {
+    PENDING = "pending",
+    APPROVED = "approved",
+    REJECTED = "rejected",
+    REFUNDED = "refunded",
+    EXCHANGED = "exchanged",
+    CREDITED = "credited",
+}
+
+@Entity("returns")
+export class Return {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column()
+    @Column({ type: "uuid" })
+    sale_id: string;
+
+    @ManyToOne(() => Sale)
+    @JoinColumn({ name: "sale_id", referencedColumnName: "id" })
+    sale: Sale;
+
+    @Column({ type: "uuid" })
     sale_item_id: string;
 
-    @ManyToOne(() => SaleItem, { eager: true })
-    @JoinColumn({ name: "sale_item_id" })
+    @ManyToOne(() => SaleItem)
+    @JoinColumn({ name: "sale_item_id", referencedColumnName: "id" })
     sale_item: SaleItem;
-
-    @Column("int")
-    quantity: number;
 
     @Column({ type: "text", nullable: true })
     reason: string;
 
-    @CreateDateColumn({ name: "created_at" })
-    createdAt: Date;
+    @Column({
+        type: "enum",
+        enum: ReturnResolution,
+        default: ReturnResolution.REFUND
+    })
+    resolution: ReturnResolution;
+
+    @Column({
+        type: "enum",
+        enum: ReturnStatus,
+        default: ReturnStatus.PENDING
+    })
+    status: ReturnStatus;
+
+    @Column({ type: "text", nullable: true })
+    inspection_notes: string | null;
+
+    @Column({ type: "text", nullable: true })
+    staff_id: string | null; // who created the return (cashier)
+
+    @Column({ type: "text", nullable: true })
+    manager_id: string | null; // who approved/rejected
+
+    @CreateDateColumn({ type: "timestamptz" })
+    created_at: Date;
+
+    @UpdateDateColumn({ type: "timestamptz" })
+    updated_at: Date;
+    
+    @OneToMany(()=> StoreCredit, (storeCredit) => storeCredit.return)
+    storeCredits:StoreCredit[]
 }

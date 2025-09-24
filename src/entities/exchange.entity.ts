@@ -10,46 +10,43 @@ import {
 import { Return } from "./return-item.entity";
 import { Store } from "./store.entity";
 
-export enum RefundStatus {
-    INITIATED = "initiated",
+export enum ExchangeStatus {
+    PENDING = "pending",
     COMPLETED = "completed",
-    FAILED = "failed"
+    CANCELLED = "cancelled"
 }
 
-@Entity("refunds")
-export class Refund {
+@Entity("exchanges")
+export class Exchange {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
     @Column({ type: "uuid" })
     return_id: string;
 
-    @ManyToOne(() => Return, { onDelete: "CASCADE" })
+    @ManyToOne(() => Return)
     @JoinColumn({ name: "return_id", referencedColumnName: "id" })
     return: Return;
 
     @Column({ type: "uuid" })
     store_id: string;
 
-    @ManyToOne(() => Store, store => store.refunds, { onDelete: "CASCADE" })
-    @JoinColumn({ name: "store_id", referencedColumnName: "id" })
+    @ManyToOne(() => Store, store => store.exchanges, { onDelete: "CASCADE" })
+    @JoinColumn({ name: "store_id", referencedColumnNamr: "id" })
     store: Store;
 
-    @Column({ type: "float8", precision: 12, scale: 2 })
-    amount: number;
+    @Column({ type: "uuid" })
+    new_product_variant_id: string;
 
-    @Column({ type: "text" })
-    method: string; // cash | card | store_credit etc.
+    @Column({ type: "float8", precision: 12, scale: 2, default: 0 })
+    price_difference: number;
 
     @Column({
         type: "enum",
-        enum: RefundStatus,
-        default: RefundStatus.INITIATED
+        enum: ExchangeStatus,
+        default: ExchangeStatus.PENDING
     })
-    status: RefundStatus;
-
-    @Column({ type: "timestamptz", nullable: true })
-    processed_at: Date | null;
+    status: ExchangeStatus;
 
     @CreateDateColumn({ type: "timestamptz" })
     created_at: Date;
