@@ -1,18 +1,18 @@
-import { IsUUID, IsInt, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsUUID, IsInt, IsNumber, IsOptional, Min } from "class-validator";
 
 export class SaleItemDto {
-  @IsUUID()
-  variant_id: string;
+    @IsUUID()
+    variantId: string;
 
-  @IsInt()
-  @Min(1)
-  quantity: number;
+    @IsInt()
+    @Min(1)
+    quantity: number;
 
-  @IsNumber()
-  @Min(0)
-  unit_price: number;
+    @IsNumber()
+    @Min(0)
+    unitPrice: number;
 
-  @IsOptional()
-  @Min(0)
-  discount?: number;
+    @IsOptional()
+    @Min(0)
+    discount?: number;
 }

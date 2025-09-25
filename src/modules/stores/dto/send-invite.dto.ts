@@ -1,29 +1,26 @@
 import {
-  IsString,
-  IsEmail,
-  IsUUID,
-  IsOptional,
-  IsNotEmpty,
-} from 'class-validator';
+    IsString,
+    IsEmail,
+    IsUUID,
+    IsOptional,
+    IsNotEmpty
+} from "class-validator";
 
 export class SendInviteDto {
-  @IsUUID()
-  store_id?: string;
+    @IsUUID()
+    storeId?: string;
 
-  @IsUUID()
-  business_id: string;
+    @IsUUID()
+    businessId: string;
 
-  @IsEmail()
-  email: string;
+    @IsEmail()
+    email: string;
 
-  @IsString()
-  @IsNotEmpty()
-  role: string;
+    @IsString()
+    @IsNotEmpty()
+    role: string;
 
-  @IsString()
-  store_name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  invited_by: string;
+    @IsString()
+    @IsNotEmpty()
+    invitedBy: string;
 }

@@ -1,45 +1,45 @@
 import {
-  IsUUID,
-  IsArray,
-  IsNumber,
-  IsString,
-  IsOptional,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { SaleItemDto } from './sale-item.dto';
+    IsUUID,
+    IsArray,
+    IsNumber,
+    IsString,
+    IsOptional,
+    ValidateNested
+} from "class-validator";
+import { Type } from "class-transformer";
+import { SaleItemDto } from "./sale-item.dto";
 
 export class CreateSaleDto {
-  @IsUUID()
-  store_id: string;
+    @IsUUID()
+    storeId: string;
 
-  @IsUUID()
-  business_id: string;
+    @IsUUID()
+    businessId: string;
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SaleItemDto)
-  items: SaleItemDto[];
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => SaleItemDto)
+    items: SaleItemDto[];
 
-  @IsNumber()
-  total_amount: number;
+    @IsNumber()
+    totalAmount: number;
 
-  @IsOptional()
-  payment_method?: string;
+    @IsOptional()
+    paymentMethod?: string;
 
-  @IsOptional()
-  reference?: string;
+    @IsOptional()
+    reference?: string;
 
-  @IsOptional()
-  created_by?: string;
+    @IsOptional()
+    createdBy?: string;
 
-  @IsString()
-  idempotency_key: string;
+    @IsString()
+    idempotencyKey: string;
 
-  @IsOptional()
-  customer?: {
-    name: string | undefined;
-    email: string | undefined;
-    phone: string | undefined;
-  };
+    @IsOptional()
+    customer?: {
+        name: string | undefined;
+        email: string | undefined;
+        phone: string | undefined;
+    };
 }

@@ -1,50 +1,50 @@
 import {
-  IsUUID,
-  IsInt,
-  Min,
-  IsOptional,
-  ValidateNested,
-  ArrayMinSize,
-  IsArray,
-  IsString,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+    IsUUID,
+    IsInt,
+    Min,
+    IsOptional,
+    ValidateNested,
+    ArrayMinSize,
+    IsArray,
+    IsString
+} from "class-validator";
+import { Type } from "class-transformer";
 
 export class DeductStockItemDto {
-  @IsUUID()
-  store_id: string;
+    @IsUUID()
+    storeId: string;
 
-  @IsUUID()
-  business_id: string;
+    @IsUUID()
+    businessId: string;
 
-  @IsUUID()
-  variant_id: string;
+    @IsUUID()
+    variantId: string;
 
-  @IsInt()
-  @Min(1)
-  quantity: number;
+    @IsInt()
+    @Min(1)
+    quantity: number;
 
-  @IsOptional()
-  @IsString()
-  reason?: string; // e.g., "sale", "wastage", "return"
+    @IsOptional()
+    @IsString()
+    reason?: string; // e.g., "sale", "wastage", "return"
 
-  @IsOptional()
-  @IsString()
-  reference?: string;
+    @IsOptional()
+    @IsString()
+    reference?: string;
 
-  @IsOptional()
-  @IsString()
-  created_by?: string;
+    @IsOptional()
+    @IsString()
+    createdBy?: string;
 }
 
 export class DeductStockDto {
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => DeductStockItemDto)
-  deductions: DeductStockItemDto[];
+    @IsArray()
+    @ArrayMinSize(1)
+    @ValidateNested({ each: true })
+    @Type(() => DeductStockItemDto)
+    deductions: DeductStockItemDto[];
 
-  @IsOptional()
-  @IsString()
-  idempotency_key?: string; // prevents duplicate bulk deductions
+    @IsOptional()
+    @IsString()
+    idempotencyKey?: string; // prevents duplicate bulk deductions
 }

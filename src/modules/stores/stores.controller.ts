@@ -18,7 +18,6 @@ import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { SendInviteDto } from './dto/send-invite.dto';
-import { InviteUserDto } from './dto/invite-user.dto';
 import { Multer } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto';
