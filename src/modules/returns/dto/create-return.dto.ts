@@ -1,48 +1,56 @@
 import {
-    IsUUID,
-    IsString,
-    IsIn,
-    IsOptional,
-    IsNumber,
-    Min,
-    IsArray,
-    ValidateNested
-} from "class-validator";
-import { Type } from "class-transformer";
+  IsUUID,
+  IsString,
+  IsIn,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ReturnResolution } from 'src/entities/return.entity';
 
 export class ReturnItemDto {
-    @IsUUID()
-    saleItemId: string;
+  @IsUUID()
+  saleItemId: string;
 
-    @IsString()
-    reason: string;
+  @IsString()
+  reason: string;
 
-    @IsIn(["refund", "exchange", "store_credit"])
-    resolution: "refund" | "exchange" | "store_credit";
+  @IsEnum(ReturnResolution)
+  resolution: ReturnResolution;
 
-    @IsOptional()
-    @IsUUID()
-    newProductVariantId?: string; // only for exchange
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExchangeItemDto)
+  exchanges?: ExchangeItemDto[]; // Only for exchanges
 
-    @IsOptional()
-    @IsNumber()
-    @Min(1)
-    quantity?: number; // partial quantity return allowed
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  quantity?: number; // partial quantity return allowed
+}
+
+export class ExchangeItemDto {
+  newProductVariantId: string;
 }
 
 export class CreateReturnDto {
-    @IsUUID()
-    storeId: string;
-    
-    @IsUUID()
-    saleId: string;
+  @IsUUID()
+  storeId: string;
 
-    @IsOptional()
-    @IsUUID()
-    staffId?: string;
+  @IsUUID()
+  saleId: string;
 
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => ReturnItemDto)
-    items: ReturnItemDto[];
+  @IsOptional()
+  @IsUUID()
+  staffId?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReturnItemDto)
+  items: ReturnItemDto[];
 }

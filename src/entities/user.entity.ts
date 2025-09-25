@@ -25,8 +25,8 @@ export class User {
   @Column({ type: 'text', unique: true })
   email: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  store_id: string | null; // FK → stores(id), optional because user might not belong to a store
+  // @Column({ type: 'uuid', nullable: true })
+  // store_id: string | null; // FK → stores(id), optional because user might not belong to a store
 
   @Column({ type: 'uuid', nullable: true })
   business_id: string | null; // FK → businesses(id), optional because user might not belong to a business
@@ -46,10 +46,10 @@ export class User {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date;
 
-  // 👇 Relation: many users can belong to one store
-  @ManyToOne(() => Store, (store) => store.users, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
-  store: Store;
+  // // 👇 Relation: many users can belong to one store
+  // @ManyToOne(() => Store, (store) => store.users, { onDelete: 'RESTRICT' })
+  // @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
+  // store: Store;
 
   // 👇 Relation: many users can belong to one business
   @ManyToOne(() => Business, (business) => business.users, {
@@ -59,14 +59,14 @@ export class User {
   business: Business;
 
   // 👇 Relation: one user can appear in many store_users (assignments)
-  @OneToMany(() => StoreUser, (store_users) => store_users.user)
-  store_users: StoreUser[];
+  @OneToMany(() => StoreUser, (storeUsers) => storeUsers.user)
+  storeUsers: StoreUser[];
 
   // 👇 Relation: one user can create multiple sales
   @OneToMany(() => Sale, (sale) => sale.user)
   sales: Sale[];
 
   // 👇 Relation: one user can create multiple inventory logs
-  @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.user)
-  inventory_logs: InventoryLog[];
+  @OneToMany(() => InventoryLog, (inventoryLog) => inventoryLog.user)
+  inventoryLogs: InventoryLog[];
 }

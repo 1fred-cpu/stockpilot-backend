@@ -24,7 +24,7 @@ export class BusinessController {
   constructor(private readonly businessService: BusinessService) {}
 
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('image_file'))
+  @UseInterceptors(FileInterceptor('imageFile'))
   @Post('register')
   async registerBusiness(
     @Body(ValidationPipe) dto: RegisterBusinessDto,

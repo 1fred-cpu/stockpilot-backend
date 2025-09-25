@@ -188,13 +188,13 @@ export class StoresService {
     try {
       const store = await this.storeRepo.findOne({
         where: { id: storeId },
-        relations: ['store_users', 'store_users.user'],
+        relations: ['storeUsers', 'storeUsers.user'],
       });
       if (!store) {
         throw new NotFoundException('Cannot find store');
       }
       // Enhance: Add total users and roles summary
-      const users = store.store_users.map((u) => ({
+      const users = store.storeUsers.map((u) => ({
         id: u.user.id,
         name: u.user.name,
         email: u.user.email,
@@ -248,7 +248,7 @@ export class StoresService {
       // 2. Fetch stores with relations
       const stores = await this.storeRepo.find({
         where: { business_id: businessId },
-        relations: ['store_users', 'store_users.user'], // include users (with role info)
+        relations: ['storeUsers', 'storeUsers.user'], // include users (with role info)
       });
 
       if (stores.length === 0) {
@@ -298,10 +298,10 @@ export class StoresService {
 
           return {
             ...store,
-            store_users: store.store_users.map((u) => ({
-              id: u.user.id,
-              name: u.user.name,
-              email: u.user.email,
+            storeUsers: store.storeUsers.map((u) => ({
+              id: u.user?.id,
+              name: u.user?.name,
+              email: u.user?.email,
               role: u.role,
               status: u.status,
             })),
@@ -313,10 +313,10 @@ export class StoresService {
               total_products: totalProducts,
               low_stock_count: lowStockProducts,
             },
-            managers: store.store_users
-              .filter((user) => user.role === 'Owner' || 'Admin')
+            managers: store.storeUsers
+              .filter((user) => user.role === 'manager' || 'owner')
               .map((manager) => ({
-                id: manager.user.id,
+                id: manager.user?.id,
                 name: manager.user.name,
                 email: manager.email,
               })),
@@ -803,7 +803,7 @@ export class StoresService {
         // 1. Ensure store exists with related users
         const store = await manager.findOne(Store, {
           where: { id: storeId },
-          relations: ['store_users', 'store_users.user'], // load store-users mapping
+          relations: ['storeUsers', 'storeUsers.user'], // load store-users mapping
         });
 
         if (!store) {
@@ -811,8 +811,8 @@ export class StoresService {
         }
 
         // 2. Handle users in this store
-        if (store.store_users?.length) {
-          for (const storeUser of store.store_users) {
+        if (store.storeUsers?.length) {
+          for (const storeUser of store.storeUsers) {
             const user = storeUser.user;
 
             // Remove this store-user link
@@ -824,9 +824,6 @@ export class StoresService {
             });
 
             if (otherStores === 0) {
-              // User does not belong to any other store, safe to delete
-              await manager.remove(user);
-
               // Delete from Supabase Auth as well
               const { error } = await this.supabase.auth.admin.deleteUser(
                 user.id,
@@ -836,6 +833,9 @@ export class StoresService {
                   `Failed to delete user ${user.id} from Supabase: ${error.message}`,
                 );
               }
+
+              // User does not belong to any other store, safe to delete
+              await manager.remove(user);
             }
           }
         }

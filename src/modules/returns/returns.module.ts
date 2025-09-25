@@ -7,7 +7,7 @@ import { Exchange, ExchangeStatus } from '../../entities/exchange.entity';
 import { Sale } from '../../entities/sale.entity';
 import { SaleItem } from '../../entities/sale-item.entity';
 import { StoreInventory } from '../../entities/store-inventory.entity';
-import { ProductVariant } from '../../entities/producr-variants.entity';
+import { ProductVariant } from '../../entities/product-variant.entity';
 import { StoreCredit } from '../../entities/store-credit.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HandleErrorService } from '../../helpers/handle-error.helper';

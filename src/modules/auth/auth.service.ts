@@ -28,8 +28,8 @@ export class AuthService {
       // 1. Fetch user
       const user = await this.userRepo.findOne({
         where: { email },
-        select: ['id', 'name', 'email', 'business_id', 'store_id'],
-        relations: ['store_users'],
+        select: ['id', 'name', 'email', 'business_id'],
+        relations: ['storeUsers'],
       });
 
       if (!user) {
@@ -38,9 +38,9 @@ export class AuthService {
 
       // 2. Handle setup states
       if (
-        user.store_users[0]?.role === 'owner' &&
+        user.storeUsers[0]?.role === 'owner' &&
         !user.business_id &&
-        !user.store_id
+        !user.storeUsers[0].store_id
       ) {
         return {
           status: 'PENDING_SETUP',
@@ -50,16 +50,16 @@ export class AuthService {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.store_users[0]?.role,
+            role: user.storeUsers[0]?.role,
           },
           stores: [],
-          active_store: null,
+          activeStore: null,
         };
       }
 
       if (
-        user.store_users[0]?.role !== 'owner' &&
-        (!user.business_id || !user.store_id)
+        user.storeUsers[0]?.role !== 'owner' &&
+        (!user.business_id || !user.storeUsers[0].store_id)
       ) {
         return {
           status: 'PENDING_ASSIGNMENT',
@@ -70,31 +70,32 @@ export class AuthService {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.store_users[0]?.role,
+            role: user.storeUsers[0]?.role,
           },
           stores: [],
-          active_store: null,
+          activeStore: null,
         };
       }
 
       // 3. If user is properly linked → fetch stores
       let stores: any[] = [];
 
-      if (user.store_users[0]?.role === 'owner') {
-        // Admin → all stores under their business
+      if (user.storeUsers[0]?.role === 'owner') {
+        // Owner → all stores under their business
         const allStores = await this.storeRepo.find({
           where: { business: { id: user.business_id as string } },
           relations: ['business'],
         });
 
         stores = allStores.map((store) => ({
-          store_id: store.id,
-          business_id: store.business_id,
-          store_name: store.name,
-          business_name: store.business.name,
+          storeId: store.id,
+          businessId: store.business_id,
+          storeName: store.name,
+          businessName: store.business.name,
           currency: store.currency,
           location: store.location,
-          is_default: false,
+          address: store.address,
+          isdefault: false,
         }));
       } else {
         // Normal user → only their stores
@@ -104,40 +105,40 @@ export class AuthService {
         });
 
         stores = storeUsers.map((su) => ({
-          store_id: su.store.id,
-          store_name: su.store.name,
-          business_id: su.business_id,
-          business_name: su.store.business.name,
+          storeId: su.store.id,
+          storeName: su.store.name,
+          businessId: su.business_id,
+          businessName: su.store.business.name,
           currency: su.store.currency,
           location: su.store.location,
+          address: su.store.address,
           role: su.role,
-          is_default: su.is_default ?? false,
+          isDefault: su.is_default ?? false,
         }));
       }
 
       // 4. Pick active store
-      const active_store =
-        stores.find((s) => s.is_default) || stores[0] || null;
+      const activeStore = stores.find((s) => s.isDefault) || stores[0] || null;
 
       return {
         status: 'ACTIVE',
         message: 'Login successful',
-        user,
+        user: { ...user, role: user.storeUsers?.[0]?.role },
         stores,
-        active_store,
+        activeStore,
       };
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getUserWithStores');
     }
   }
 
-  async signupUser(dto: { email: string; name: string }) {
+  async signupUser(dto: { email: string; name: string; userId: string }) {
     try {
       const user = await this.usersService.createUser(dto);
       return {
         message: 'Account registered successfully',
         nextStep: 'REGISTER_BUSINESS',
-        user,
+        user: { ...user, role: 'owner' },
       };
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'signupWithEmailAndPassword');
@@ -149,7 +150,7 @@ export class AuthService {
       const existingUser = await this.usersService.findUser({
         email: dto.email,
       });
-
+      console.log(existingUser);
       if (existingUser) {
         // Case A: User exists already with email/password
         if (existingUser.auth_provider === 'local') {
@@ -160,7 +161,10 @@ export class AuthService {
           await this.userRepo.save(existingUser);
 
           // ✅ If user already has business + store → fetch enriched data
-          if (existingUser.business_id && existingUser.store_id) {
+          if (
+            existingUser.business_id &&
+            existingUser.storeUsers?.[0]?.store_id
+          ) {
             const data = await this.getUserWithStores(existingUser.email);
             return {
               nextStep: 'COMPLETED',
@@ -169,19 +173,22 @@ export class AuthService {
           }
 
           const nextStep =
-            !existingUser.business_id && !existingUser.store_id
+            !existingUser.business_id && !existingUser.storeUsers[0].store_id
               ? 'REGISTER_BUSINESS'
               : 'dashboard';
 
           return {
             message: 'Google account linked successfully',
             nextStep,
-            user: existingUser,
+            user: { ...existingUser, role: 'owner' },
           };
         }
 
         // Case B: Already Google user → just log them in
-        if (existingUser.business_id && existingUser.store_id) {
+        if (
+          existingUser.business_id &&
+          existingUser.storeUsers?.[0]?.store_id
+        ) {
           // ✅ Fetch enriched data
           const data = await this.getUserWithStores(existingUser.email);
           return {
@@ -191,7 +198,7 @@ export class AuthService {
         }
 
         const nextStep =
-          !existingUser.business_id && !existingUser.store_id
+          !existingUser.business_id && !existingUser.storeUsers?.[0]?.store_id
             ? 'REGISTER_BUSINESS'
             : 'dashboard';
 

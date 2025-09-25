@@ -20,7 +20,7 @@ class Inventory {
 
   @IsNumber()
   @Min(0)
-  low_stock_quantity: number;
+  lowStockQuantity: number;
 
   @IsNumber()
   @Min(0)
@@ -46,31 +46,31 @@ export class CreateVariantDto {
 
   @IsOptional()
   @IsString()
-  image_url: string;
+  imageUrl: string;
 
   @IsOptional()
-  image_file: Multer.File;
+  imageFile: Multer.File;
 
   @IsOptional()
   @IsDateString()
-  expiry_date?: string;
+  expiryDate?: string;
 
   @IsOptional()
   @IsNumber()
-  image_file_index?: number;
+  imageFileIndex?: number;
 }
 
 export class CreateProductDto {
   @IsOptional()
   @IsUUID()
-  business_id: string;
+  businessId: string;
 
   @IsOptional()
   @IsString()
-  business_name: string;
+  businessName: string;
 
   @IsUUID()
-  store_id: string;
+  storeId: string;
 
   @IsString()
   name: string;
@@ -83,7 +83,7 @@ export class CreateProductDto {
   thumbnail: string;
 
   @IsOptional()
-  thumbnail_file?: Multer.File;
+  thumbnailFile?: Multer.File;
 
   @IsString()
   category?: string;
@@ -93,7 +93,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsBoolean()
-  track_batches?: boolean;
+  trackBatches?: boolean;
 
   // 👇 Transform stringified JSON into an array
   @IsOptional()
@@ -124,7 +124,7 @@ export class CreateProductDto {
     }
     return value;
   })
-  product_variants: CreateVariantDto[];
+  productVariants: CreateVariantDto[];
 
   @IsOptional()
   @IsArray()
@@ -138,5 +138,5 @@ export class CreateProductDto {
     }
     return value;
   })
-  removed_variant_ids: string[];
+  removedVariantIds: string[];
 }

@@ -41,11 +41,9 @@ export class UsersService {
 
       // 2. Define user payload
       const payload = {
-        id: uuidv4(),
+        id: dto.userId,
         name: dto.name,
         email: dto.email,
-        store_id: null,
-        role: 'Admin',
         auth_provider: 'local',
         business_id: null,
         status: 'pending_setup',
@@ -62,13 +60,13 @@ export class UsersService {
     }
   }
 
-  
   /**
    * Find a single user by ID and optional store_id
    */
   async findUser(query: Partial<Record<keyof User, any>>) {
     const user = await this.userRepo.findOne({
       where: query,
+      relations: ['storeUsers'],
     });
 
     return user || null;
@@ -87,7 +85,7 @@ export class UsersService {
     }
   }
 
-   async createUserWithTransaction(userData: any) {
+  async createUserWithTransaction(userData: any) {
     try {
       return await this.dataSource.transaction(async (manager) => {
         const data = await manager.create(User, userData);

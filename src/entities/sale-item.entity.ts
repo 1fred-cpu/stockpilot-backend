@@ -9,7 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Business } from './business.entity';
-import { ProductVariant } from './product-variants.entity';
+import { ProductVariant } from './product-variant.entity';
 import { Store } from './store.entity';
 import { Sale } from './sale.entity';
 
@@ -45,6 +45,9 @@ export class SaleItem {
   @Column({ type: 'float8' })
   total_price: number;
 
+  @Column({ type: 'text', nullable: true, default: null })
+  status: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 
@@ -56,20 +59,17 @@ export class SaleItem {
   @JoinColumn({ name: 'business_id', referencedColumnName: 'id' })
   business: Business;
 
-  @ManyToOne(() => Store, (store) => store.sale_items, {
+  @ManyToOne(() => Store, (store) => store.saleItems, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
   store: Store;
 
-  @ManyToOne(
-    () => ProductVariant,
-    (product_variant) => product_variant.sale_items,
-  )
+  @ManyToOne(() => ProductVariant, (productVariant) => productVariant.saleItems)
   @JoinColumn({ name: 'variant_id', referencedColumnName: 'id' })
-  product_variant: ProductVariant;
+  productVariant: ProductVariant;
 
-  @ManyToOne(() => Sale, (sale) => sale.sale_items)
+  @ManyToOne(() => Sale, (sale) => sale.saleItems)
   @JoinColumn({ name: 'sale_id', referencedColumnName: 'id' })
   sale: Sale;
 }

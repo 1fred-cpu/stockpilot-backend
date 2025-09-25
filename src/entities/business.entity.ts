@@ -11,7 +11,7 @@ import { User } from './user.entity';
 import { StoreUser } from './store-user.entity';
 import { Product } from './product.entity';
 import { Category } from './category.entity';
-import { ProductVariant } from './product-variants.entity';
+import { ProductVariant } from './product-variant.entity';
 import { StoreInventory } from './store-inventory.entity';
 import { Sale } from './sale.entity';
 import { Customer } from './customer.entity';
@@ -58,7 +58,7 @@ export class Business {
 
   // 👇 Relation: one business can have many store_users
   @OneToMany(() => StoreUser, (storeUser) => storeUser.business)
-  store_users: StoreUser[];
+  storeUsers: StoreUser[];
 
   // 👇 Relation: one business can have many users
   @OneToMany(() => User, (user) => user.business)
@@ -73,18 +73,12 @@ export class Business {
   categories: Category[];
 
   // 👇 Relation: one business can have many product_variants
-  @OneToMany(
-    () => ProductVariant,
-    (product_variant) => product_variant.business,
-  )
-  product_variants: ProductVariant[];
+  @OneToMany(() => ProductVariant, (productVariant) => productVariant.business)
+  productVariants: ProductVariant[];
 
   // 👇 Relation: one business can have many store_inventories
-  @OneToMany(
-    () => StoreInventory,
-    (store_inventory) => store_inventory.business,
-  )
-  store_inventories: StoreInventory[];
+  @OneToMany(() => StoreInventory, (storeInventory) => storeInventory.business)
+  storeInventories: StoreInventory[];
 
   // 👇 Relation: one business can have many sales
   @OneToMany(() => Sale, (sale) => sale.business)

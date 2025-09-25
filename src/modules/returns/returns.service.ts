@@ -10,10 +10,14 @@ import { Exchange, ExchangeStatus } from '../../entities/exchange.entity';
 import { Sale } from '../../entities/sale.entity';
 import { SaleItem } from '../../entities/sale-item.entity';
 import { StoreInventory } from '../../entities/store-inventory.entity';
-import { ProductVariant } from '../../entities/producr-variants.entity';
-import { StoreCredit } from '../../entities/store-credit.entity';
+import { ProductVariant } from '../../entities/product-variant.entity';
+import {
+  StoreCredit,
+  StoreCreditStatus,
+} from '../../entities/store-credit.entity';
 import { HandleErrorService } from '../../helpers/handle-error.helper';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { ReviewReturnDto } from './dto/review-return.dto';
 
 export class ReturnsService {
   constructor(
@@ -111,7 +115,7 @@ export class ReturnsService {
               return_id: ret.id,
               customer_id: sale.customer_id,
               amount: Number(saleItem.unit_price) * quantity,
-              status: 'pending', // waiting for manager approval
+              status: StoreCreditStatus.PENDING, // waiting for manager approval
             });
             await manager.save(credit);
           }
@@ -129,13 +133,7 @@ export class ReturnsService {
   /**
    * Manager reviews multiple returns in one request.
    */
-  async reviewReturns(dto: {
-    returnIds: string[];
-    approve: boolean;
-    notes?: string;
-    managerId?: string;
-    refundMethod?: string;
-  }) {
+  async reviewReturns(dto: ReviewReturnDto) {
     return this.dataSource.transaction(async (manager) => {
       const results: any[] = [];
 
@@ -228,7 +226,7 @@ export class ReturnsService {
             return_id: ret.id,
             customer_id: sale.customer_id,
             amount: lineAmount,
-            status: 'active',
+            status: StoreCreditStatus.ACTIVE,
           });
           await manager.save(credit);
 

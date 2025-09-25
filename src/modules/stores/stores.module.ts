@@ -12,7 +12,7 @@ import { Store } from 'src/entities/store.entity';
 import { Business } from 'src/entities/business.entity';
 import { SaleItem } from 'src/entities/sale-item.entity';
 import { Product } from 'src/entities/product.entity';
-import { ProductVariant } from 'src/entities/product-variants.entity';
+import { ProductVariant } from 'src/entities/product-variant.entity';
 import { StoreInventory } from 'src/entities/store-inventory.entity';
 import { StoreUser } from 'src/entities/store-user.entity';
 import { User } from 'src/entities/user.entity';

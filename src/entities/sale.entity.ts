@@ -88,8 +88,8 @@ export class Sale {
   user: User;
 
   // 👇 Relation: many sales can be created by a user
-  @OneToMany(() => SaleItem, (sale_item) => sale_item.sale)
-  sale_items: SaleItem[];
+  @OneToMany(() => SaleItem, (saleItem) => saleItem.sale)
+  saleItems: SaleItem[];
 
   @OneToMany(() => Refund, (refund) => refund.sale)
   refunds: Refund[];

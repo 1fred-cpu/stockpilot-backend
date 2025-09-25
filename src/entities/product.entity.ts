@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { Business } from './business.entity';
 import { Category } from './category.entity';
-import { ProductVariant } from './product-variants.entity';
+import { ProductVariant } from './product-variant.entity';
 import { Store } from './store.entity';
 
 @Entity('products')
@@ -75,8 +75,8 @@ export class Product {
   @JoinColumn({ name: 'category_id', referencedColumnName: 'id' })
   category: Category;
 
-  @OneToMany(() => ProductVariant, (product_variant) => product_variant.product)
-  product_variants: ProductVariant[];
+  @OneToMany(() => ProductVariant, (productVariant) => productVariant.product)
+  productVariants: ProductVariant[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;

@@ -261,7 +261,7 @@ export class AnalyticsService {
 
       const data = await this.saleItemRepo
         .createQueryBuilder('saleItem')
-        .leftJoin('saleItem.product_variant', 'variant')
+        .leftJoin('saleItem.productVariant', 'variant')
         .where('saleItem.store_id = :storeId', { storeId })
         .andWhere('saleItem.created_at BETWEEN :start AND :end', {
           start: firstDayOfMonth,
@@ -304,8 +304,8 @@ export class AnalyticsService {
         where: {
           store_id: storeId,
         },
-        select: ['quantity', 'product_variant', 'total_quantity'],
-        relations: ['product_variant', 'product_variant.product'],
+        select: ['quantity', 'productVariant', 'total_quantity'],
+        relations: ['productVariant', 'productVariant.product'],
       });
 
       if (!data || data.length === 0) {
@@ -319,16 +319,16 @@ export class AnalyticsService {
       > = {};
 
       for (const row of data) {
-        if (!categoryMap[row.product_variant?.product.category_type]) {
-          categoryMap[row.product_variant?.product.category_type] = {
-            category: row.product_variant?.product.category_type,
+        if (!categoryMap[row.productVariant?.product.category_type]) {
+          categoryMap[row.productVariant?.product.category_type] = {
+            category: row.productVariant?.product.category_type,
             stock: 0,
             total: 0,
           };
         }
-        categoryMap[row.product_variant?.product.category_type].stock +=
+        categoryMap[row.productVariant?.product.category_type].stock +=
           row.quantity || 0;
-        categoryMap[row.product_variant?.product.category_type].total +=
+        categoryMap[row.productVariant?.product.category_type].total +=
           row.total_quantity || 0;
       }
 
@@ -351,7 +351,7 @@ export class AnalyticsService {
 
       const data = await this.saleItemRepo
         .createQueryBuilder('saleItem')
-        .leftJoin('saleItem.product_variant', 'variant')
+        .leftJoin('saleItem.productVariant', 'variant')
         .where('saleItem.store_id = :storeId', { storeId })
         .orderBy('saleItem.created_at', 'DESC')
         .take(5)
@@ -393,7 +393,7 @@ export class AnalyticsService {
 
       const inventories = await this.inventoryRepo.find({
         where: { store_id: storeId },
-        select: ['quantity', 'low_stock_quantity', 'product_variant'],
+        select: ['quantity', 'low_stock_quantity', 'productVariant'],
       });
       if (inventories.length === 0) {
         return {
@@ -438,7 +438,7 @@ export class AnalyticsService {
       const inventories = await this.inventoryRepo.find({
         where: { store_id: storeId },
 
-        relations: ['product_variant', 'product_variant.product'],
+        relations: ['productVariant', 'productVariant.product'],
       });
 
       if (inventories.length === 0) {
@@ -458,7 +458,7 @@ export class AnalyticsService {
 
       for (const i of inventories) {
         const categoryName =
-          i.product_variant.product.category_type || 'Uncategorized';
+          i.productVariant.product.category_type || 'Uncategorized';
 
         if (!categoryMap[categoryName]) {
           categoryMap[categoryName] = {
@@ -489,7 +489,7 @@ export class AnalyticsService {
       // 1. Load inventories with variant + product
       const inventories = await this.inventoryRepo.find({
         where: { store_id: storeId },
-        relations: ['product_variant', 'product_variant.product'],
+        relations: ['productVariant', 'productVariant.product'],
       });
 
       if (!inventories.length) {
@@ -521,7 +521,7 @@ export class AnalyticsService {
       // 3. Loop through each inventory
       for (const inv of inventories) {
         const category =
-          inv.product_variant.product.category_type || 'Uncategorized';
+          inv.productVariant.product.category_type || 'Uncategorized';
 
         if (!categoryMap[category]) {
           categoryMap[category] = {
@@ -563,7 +563,7 @@ export class AnalyticsService {
       // Fetch inventory with product variants
       const inventories = await this.inventoryRepo.find({
         where: { store_id: storeId },
-        relations: ['product_variant'], // ensure variant is joined
+        relations: ['productVariant'], // ensure variant is joined
       });
 
       let inStock = 0;

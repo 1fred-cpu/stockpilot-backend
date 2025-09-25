@@ -13,7 +13,7 @@ import { Category } from './category.entity';
 import { Store } from './store.entity';
 import { User } from './user.entity';
 import { StoreInventory } from './store-inventory.entity';
-import { ProductVariant } from './product-variants.entity';
+import { ProductVariant } from './product-variant.entity';
 
 @Entity('inventory_logs')
 export class InventoryLog {
@@ -61,27 +61,27 @@ export class InventoryLog {
 
   @ManyToOne(
     () => ProductVariant,
-    (product_variant) => product_variant.inventory_logs,
+    (productVariant) => productVariant.inventoryLogs,
     { onDelete: 'SET NULL' },
   )
   @JoinColumn({ name: 'variant_id', referencedColumnName: 'id' })
-  product_variant: ProductVariant;
+  productVariant: ProductVariant;
 
   @ManyToOne(
     () => StoreInventory,
-    (store_inventory) => store_inventory.inventory_logs,
+    (storeInventory) => storeInventory.inventoryLogs,
     { onDelete: 'SET NULL' },
   )
   @JoinColumn({ name: 'inventory_id', referencedColumnName: 'id' })
-  store_inventory: StoreInventory;
+  storeInventory: StoreInventory;
 
-  @ManyToOne(() => Store, (store) => store.inventory_logs, {
+  @ManyToOne(() => Store, (store) => store.inventoryLogs, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
   store: Store;
 
-  @ManyToOne(() => User, (user) => user.inventory_logs, {
+  @ManyToOne(() => User, (user) => user.inventoryLogs, {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'created_by', referencedColumnName: 'id' })

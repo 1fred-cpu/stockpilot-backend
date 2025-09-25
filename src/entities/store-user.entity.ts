@@ -49,21 +49,21 @@ export class StoreUser {
   updated_at: Date;
 
   // 👇 Relation: many users belong to one store
-  @ManyToOne(() => Store, (store) => store.store_users, {
+  @ManyToOne(() => Store, (store) => store.storeUsers, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'store_id' })
   store: Store;
 
   // 👇 Relation: many store_users belong to one business
-  @ManyToOne(() => Business, (business) => business.store_users, {
+  @ManyToOne(() => Business, (business) => business.storeUsers, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'business_id' })
   business: Business;
 
   // 👇 Relation: many store_users point to one user
-  @ManyToOne(() => User, (user) => user.store_users, {
+  @ManyToOne(() => User, (user) => user.storeUsers, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })

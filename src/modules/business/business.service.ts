@@ -94,8 +94,8 @@ export class BusinessService {
     try {
       let logoUrl;
       // 1. Check if business exists
-      const existingBusiness = await this.findBusiness({
-        owner_user_id: dto.owner_user_id,
+      const existingBusiness = await this.businessRepo.findOne({
+        where: { owner_user_id: dto.ownerUserId },
       });
 
       if (existingBusiness) {
@@ -109,10 +109,10 @@ export class BusinessService {
 
       const business = {
         id: uuidv4(),
-        name: dto.business_name,
-        email: dto.business_email,
-        owner_user_id: dto.owner_user_id,
-        phone: dto.business_phone,
+        name: dto.businessName,
+        email: dto.businessEmail,
+        owner_user_id: dto.ownerUserId,
+        phone: dto.businessPhone,
         logo_url: '',
         website: dto.website,
         stripe_customer_id: '',
@@ -124,11 +124,11 @@ export class BusinessService {
       const store = {
         id: uuidv4(),
         business_id: business.id,
-        name: dto.store_name,
+        name: dto.storeName,
         location: dto.location,
         currency: dto.currency,
-        email: dto.store_email,
-        phone: dto.store_phone,
+        email: dto.storeEmail,
+        phone: dto.storePhone,
         address: dto.address,
         created_at: now,
         updated_at: now,
@@ -138,10 +138,10 @@ export class BusinessService {
       const storeUser = {
         id: uuidv4(),
         store_id: store.id,
-        user_id: dto.owner_user_id,
+        user_id: dto.ownerUserId,
         business_id: business.id,
-        email: dto.store_email,
-        role: 'Owner',
+        email: dto.storeEmail,
+        role: 'owner',
         status: 'active',
         assigned_at: now,
         created_at: now,
@@ -155,7 +155,7 @@ export class BusinessService {
 
       // 4. Upload logo image file to storage
       if (file) {
-        const path = `businesses/${dto.business_name.split(
+        const path = `businesses/${dto.businessName.split(
           ' '[0],
         )}/${uuidv4()}_${file.originalname}`;
         logoUrl = await this.fileService.uploadFile(file, path, 'logos');
@@ -172,26 +172,26 @@ export class BusinessService {
         logoUrl,
       );
       return {
-        stores: [
-          {
-            store_name: results.newStore.name,
-            business_name: results.newBusiness.name,
-            store_id: results.newStore.id,
-            business_id: results.newBusiness.id,
-            currency: results.newStore.currency,
-            is_default: false,
-            location: results.newStore.location,
-            address: results.newStore.address,
-          },
-        ],
+        // stores: [
+        //   {
+        //     store_name: results.newStore.name,
+        //     business_name: results.newBusiness.name,
+        //     store_id: results.newStore.id,
+        //     business_id: results.newBusiness.id,
+        //     currency: results.newStore.currency,
+        //     is_default: false,
+        //     location: results.newStore.location,
+        //     address: results.newStore.address,
+        //   },
+        // ],
         activeStore: {
-          store_name: results.newStore.name,
-          store_id: results.newStore.id,
+          storeName: results.newStore.name,
+          storeId: results.newStore.id,
           currency: results.newStore.currency,
           location: results.newStore.location,
           address: results.newStore.address,
-          business_name: results.newBusiness.name,
-          business_id: results.newBusiness.id,
+          businessName: results.newBusiness.name,
+          businessId: results.newBusiness.id,
         },
       };
     } catch (error) {
@@ -324,7 +324,6 @@ export class BusinessService {
         // 5. update user
         const ownerUser = await manager.preload(User, {
           id: newBusiness.owner_user_id,
-          store_id: newStore.id,
           business_id: newBusiness.id,
           status: 'active',
         });

@@ -521,28 +521,28 @@ export class SalesService {
 
       // 🔹 Flatten all sale items
       const saleItems = sales.flatMap((sale) =>
-        sale.sale_items.map((item) => ({
-          sale_id: sale.id,
+        sale.saleItems.map((item) => ({
+          saleId: sale.id,
           reference: item.reference,
           customer: sale.customer_name,
-          payment_method: sale.payment_method,
-          created_at: sale.created_at,
+          paymentMethod: sale.payment_method,
+          createdAt: sale.created_at,
           quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.quantity * item.unit_price,
-          product_variant: {
-            product_name: item.product_variant?.product?.name,
-            id: item.product_variant?.id,
-            sku: item.product_variant?.sku,
-            name: item.product_variant?.name,
-            image_url: item.product_variant.image_url,
+          unitPrice: item.unit_price,
+          totalPrice: item.quantity * item.unit_price,
+          productVariant: {
+            productName: item.productVariant?.product?.name,
+            id: item.productVariant?.id,
+            sku: item.productVariant?.sku,
+            name: item.productVariant?.name,
+            imageUrl: item.productVariant.image_url,
           },
         })),
       );
 
       // 🔹 Calculate total sales amount
       const totalAmount = saleItems.reduce(
-        (sum, item) => sum + item.total_price,
+        (sum, item) => sum + item.totalPrice,
         0,
       );
 

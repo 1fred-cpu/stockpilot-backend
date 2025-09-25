@@ -35,14 +35,14 @@ export class Return {
   @Column({ type: 'uuid' })
   sale_id: string;
 
-  @ManyToOne(() => Sale)
+  @ManyToOne(() => Sale, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'sale_id', referencedColumnName: 'id' })
   sale: Sale;
 
   @Column({ type: 'uuid' })
   sale_item_id: string;
 
-  @ManyToOne(() => SaleItem)
+  @ManyToOne(() => SaleItem, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'sale_item_id', referencedColumnName: 'id' })
   sale_item: SaleItem;
 
@@ -65,6 +65,9 @@ export class Return {
 
   @Column({ type: 'text', nullable: true })
   inspection_notes: string | null;
+
+  @Column({ type: 'int8' })
+  quantity: number;
 
   @Column({ type: 'text', nullable: true })
   staff_id: string | null; // who created the return (cashier)

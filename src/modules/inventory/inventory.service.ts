@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { EventEmitterHelper } from 'src/helpers/event-emitter.helper';
 import { HandleErrorService } from 'src/helpers/handle-error.helper';
-import { ProductVariant } from '../../entities/product-variants.entity';
+import { ProductVariant } from '../../entities/product-variant.entity';
 import { StoreInventory } from '../../entities/store-inventory.entity';
 import { InventoryLog } from '../../entities/inventory-log.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -327,14 +327,14 @@ export class InventoryService {
 
         if (status) {
           items.push({
-            product_id: inv.product_variant.product.id,
-            product_name: inv.product_variant.product.name,
-            variant_id: inv.product_variant.id,
-            variant_name: inv.product_variant.name,
-            sku: inv.product_variant.sku,
-            category: inv.product_variant.product.category_type,
+            product_id: inv.productVariant.product.id,
+            product_name: inv.productVariant.product.name,
+            variant_id: inv.productVariant.id,
+            variant_name: inv.productVariant.name,
+            sku: inv.productVariant.sku,
+            category: inv.productVariant.product.category_type,
             stock: quantity,
-            image_url: inv.product_variant.image_url,
+            image_url: inv.productVariant.image_url,
             low_stock_threshold: lowStockThreshold,
             status, // new field
           });
