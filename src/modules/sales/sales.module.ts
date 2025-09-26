@@ -30,7 +30,8 @@ import { TypeOrmModule } from "@nestjs/typeorm";
             SaleItem,
             InventoryLog,
             Customer,
-            StoreInventory,StockAlert
+            StoreInventory,
+            StockAlert
         ])
     ],
     controllers: [SalesController],

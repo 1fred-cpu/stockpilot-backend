@@ -47,7 +47,7 @@ export class InventoryLog {
   @Column({ type: 'text' })
   idempotency_key: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid' ,nullable:true, default:null })
   created_by: string;
 
   @CreateDateColumn({ type: 'timestamptz' })

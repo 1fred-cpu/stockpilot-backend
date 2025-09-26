@@ -17,7 +17,6 @@ export class SalesEventsListener {
     async handleSalesEvents(payload: any) {
         const event = payload.value.event;
         const data = payload.value.data;
-      
 
         if (event === "SaleCreated") {
             await this.handleSaleCreatedEvent(data);
@@ -47,9 +46,9 @@ export class SalesEventsListener {
       <p>We appreciate your business. Below are your receipt details:</p>
       <ul>
         <li><strong>Reference:</strong> ${receipt.reference}</li>
-        <li><strong>Total Paid:</strong> ${receipt.total_amount}</li>
+        <li><strong>Total Paid:</strong> ${receipt.totalAmount}</li>
         <li><strong>Date:</strong> ${new Date(
-            receipt.created_at
+            receipt.createdAt
         ).toLocaleString()}</li>
       </ul>
       <p>You can <a href="${pdfUrl}" target="_blank">download your receipt PDF here</a>.</p>

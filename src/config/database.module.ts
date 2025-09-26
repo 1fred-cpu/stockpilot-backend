@@ -30,7 +30,9 @@ import { ReturnPolicy } from "src/entities/return-policy.entity";
                 url: config.get<string>("SUPABASE_DB_URI"), // from Supabase
                 autoLoadEntities: true, // automatically load entities
 
-                synchronize: config.get<string>("NODE_ENV") === "development", // ❌ disable in production, use migrations,
+                synchronize: false, // ❌ disable in production, use migrations,
+              migrations: [__dirname +
+                '.../migration/*{.ts,.js}'],
                 entities: [
                     Business,
                     User,
