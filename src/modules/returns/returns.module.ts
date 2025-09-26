@@ -20,6 +20,7 @@ import { HandleErrorService } from '../../helpers/handle-error.helper';
       StoreInventory,
       ProductVariant,
       StoreCredit,
+      Return,
     ]),
   ],
   controllers: [ReturnsController],

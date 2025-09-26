@@ -1,90 +1,102 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
-    ManyToOne,
-    JoinColumn,
-    OneToMany
-} from "typeorm";
-import { Sale } from "./sale.entity";
-import { Refund } from "./refund.entity";
-import { SaleItem } from "./sale-item.entity";
-import { StoreCredit } from "./store-credit.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
+import { Sale } from './sale.entity';
+import { Refund } from './refund.entity';
+import { SaleItem } from './sale-item.entity';
+import { StoreCredit } from './store-credit.entity';
+import { Store } from './store.entity';
+import { Exchange } from './exchange.entity';
 
 export enum ReturnResolution {
-    REFUND = "refund",
-    EXCHANGE = "exchange",
-    STORE_CREDIT = "store_credit"
+  REFUND = 'refund',
+  EXCHANGE = 'exchange',
+  STORE_CREDIT = 'store_credit',
 }
 
 export enum ReturnStatus {
-    PENDING = "pending",
-    APPROVED = "approved",
-    REJECTED = "rejected",
-    REFUNDED = "refunded",
-    EXCHANGED = "exchanged",
-    CREDITED = "credited"
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  REFUNDED = 'refunded',
+  EXCHANGED = 'exchanged',
+  CREDITED = 'credited',
 }
 
-@Entity("returns")
+@Entity('returns')
 export class Return {
-    @PrimaryGeneratedColumn("uuid")
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column({ type: "uuid" })
-    sale_id: string;
+  @Column({ type: 'uuid' })
+  sale_id: string;
 
-    @ManyToOne(() => Sale, { onDelete: "CASCADE" })
-    @JoinColumn({ name: "sale_id", referencedColumnName: "id" })
-    sale: Sale;
+  @ManyToOne(() => Sale, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'sale_id', referencedColumnName: 'id' })
+  sale: Sale;
 
-    @Column({ type: "uuid" })
-    sale_item_id: string;
+  @Column({ type: 'uuid' })
+  store_id: string;
 
-    @ManyToOne(() => SaleItem, { onDelete: "CASCADE" })
-    @JoinColumn({ name: "sale_item_id", referencedColumnName: "id" })
-    saleItem: SaleItem;
+  @ManyToOne(() => Store, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
+  store: Store;
 
-    @Column({ type: "text", nullable: true })
-    reason: string;
+  @Column({ type: 'uuid' })
+  sale_item_id: string;
 
-    @Column({
-        type: "enum",
-        enum: ReturnResolution,
-        default: ReturnResolution.REFUND
-    })
-    resolution: ReturnResolution;
+  @ManyToOne(() => SaleItem, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'sale_item_id', referencedColumnName: 'id' })
+  saleItem: SaleItem;
 
-    @Column({
-        type: "enum",
-        enum: ReturnStatus,
-        default: ReturnStatus.PENDING
-    })
-    status: ReturnStatus;
+  @Column({ type: 'text', nullable: true })
+  reason: string;
 
-    @Column({ type: "text", nullable: true })
-    inspection_notes: string | null;
+  @Column({
+    type: 'enum',
+    enum: ReturnResolution,
+    default: ReturnResolution.REFUND,
+  })
+  resolution: ReturnResolution;
 
-    @Column({ type: "int8" })
-    quantity: number;
+  @Column({
+    type: 'enum',
+    enum: ReturnStatus,
+    default: ReturnStatus.PENDING,
+  })
+  status: ReturnStatus;
 
-    @Column({ type: "text", nullable: true })
-    staff_id: string | null; // who created the return (cashier)
+  @Column({ type: 'text', nullable: true })
+  inspection_notes: string | null;
 
-    @Column({ type: "text", nullable: true })
-    manager_id: string | null; // who approved/rejected
+  @Column({ type: 'int8' })
+  quantity: number;
 
-    @CreateDateColumn({ type: "timestamptz" })
-    created_at: Date;
+  @Column({ type: 'text', nullable: true })
+  staff_id: string | null; // who created the return (cashier)
 
-    @UpdateDateColumn({ type: "timestamptz" })
-    updated_at: Date;
+  @Column({ type: 'text', nullable: true })
+  manager_id: string | null; // who approved/rejected
 
-    @OneToMany(() => StoreCredit, storeCredit => storeCredit.return)
-    storeCredits: StoreCredit[];
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at: Date;
 
-    @OneToMany(() => Refund, refund => refund.return)
-    refunds: Refund[];
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updated_at: Date;
+
+  @OneToMany(() => StoreCredit, (storeCredit) => storeCredit.return)
+  storeCredits: StoreCredit[];
+
+  @OneToMany(() => Refund, (refund) => refund.return)
+  refunds: Refund[];
+
+  @OneToMany(() => Exchange, (exchange) => exchange.return)
+  exchanges: Exchange[];
 }

@@ -20,14 +20,12 @@ export class HandleErrorService {
       error instanceof ConflictException ||
       error instanceof UnauthorizedException ||
       error instanceof InternalServerErrorException ||
-      error instanceof HttpException||
-      error instanceof Error 
+      error instanceof HttpException ||
+      error instanceof Error
     ) {
       throw error;
     }
-    this.logger.error(
-      `Unexpected error in ${method}: ${error.message} \n${error.stack}`,
-    );
+    this.logger.error(`Unexpected error in ${method}: ${error.message}`);
     throw new InternalServerErrorException('An unexpected error occurred');
   }
 }

@@ -24,7 +24,6 @@ export class InventoryController {
   async restock(
     @Body(new ValidationPipe({ transform: true })) dto: RestockDto,
   ) {
-    console.log('Received DTO:', dto);
     const parsedVariants =
       typeof dto?.variants === 'string'
         ? JSON.parse(dto?.variants)

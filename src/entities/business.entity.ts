@@ -89,8 +89,8 @@ export class Business {
   customers: Customer[];
 
   // 👇 Relation: one business can have many sales_items
-  @OneToMany(() => SaleItem, (sale_item) => sale_item.business)
-  sale_items: SaleItem[];
+  @OneToMany(() => SaleItem, (saleItem) => saleItem.business)
+  saleItems: SaleItem[];
 
   // 👇 Relation: one business can have many inventory_logs
   @OneToMany(() => InventoryLog, (inventory_log) => inventory_log.business)

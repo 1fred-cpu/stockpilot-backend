@@ -28,7 +28,7 @@ export class ProductsController {
   @Post(':businessId/products')
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'thumbnail_file', maxCount: 1 },
+      { name: 'thumbnailFile', maxCount: 1 },
       { name: 'variantImages', maxCount: 20 },
     ]),
   )
@@ -84,7 +84,7 @@ export class ProductsController {
   @Patch('stores/:storeId/products/:productId')
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'thumbnail_file', maxCount: 1 },
+      { name: 'thumbnailFile', maxCount: 1 },
       { name: 'variantImages', maxCount: 20 },
     ]),
   )
@@ -121,7 +121,7 @@ export class ProductsController {
       // ✅ Attach images to variants by index
       const variantsWithImages =
         parsedVariants?.map((variant) => {
-          const idx = variant.imageFile;
+          const idx = variant.imageFileIndex;
           if (typeof idx === 'number' && files.variantImages?.[idx]) {
             variant.imageFile = files.variantImages[idx];
           }
@@ -131,7 +131,7 @@ export class ProductsController {
       // ✅ Final product payload
       const productPayload = {
         ...updateProductDto,
-        store_id: storeId,
+        storeId: storeId,
         tags: parsedTags,
         productVariants: variantsWithImages,
         removedVariantIds: parsedRemovedVariantsIds,

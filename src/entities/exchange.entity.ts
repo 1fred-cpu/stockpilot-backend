@@ -24,7 +24,7 @@ export class Exchange {
   @Column({ type: 'uuid' })
   return_id: string;
 
-  @ManyToOne(() => Return)
+  @ManyToOne(() => Return, (returns) => returns.exchanges)
   @JoinColumn({ name: 'return_id', referencedColumnName: 'id' })
   return: Return;
 

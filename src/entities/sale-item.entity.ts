@@ -53,7 +53,7 @@ export class SaleItem {
 
   /** Relations */
 
-  @ManyToOne(() => Business, (business) => business.sale_items, {
+  @ManyToOne(() => Business, (business) => business.saleItems, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'business_id', referencedColumnName: 'id' })
