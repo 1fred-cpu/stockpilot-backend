@@ -16,7 +16,8 @@ import { InventoryLog } from "../../entities/inventory-log.entity";
 import { Customer } from "../../entities/customer.entity";
 import { StoreInventory } from "../../entities/store-inventory.entity";
 import { StockAlert } from "src/entities/stock-alert.entity";
-
+import { ReceiptPrinterHelper } from "../../helpers/reciept-printer.helper";
+import { WhatsappHelper } from "../../helpers/whatsapp.helper";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 @Module({
@@ -41,7 +42,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
         EventEmitterHelper,
         SalesEventsListener,
         ReceiptService,
-        ReceiptPdfService
+        ReceiptPdfService,
+        ReceiptPrinterHelper,
+        WhatsappHelper
     ]
 })
 export class SalesModule {}

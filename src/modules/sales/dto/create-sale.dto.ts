@@ -15,7 +15,7 @@ import { SaleItemDto } from './sale-item.dto';
 export enum DeliveryChannel {
   EMAIL = 'email',
   WHATSAPP = 'whatsapp',
-  PRINTER = 'print',
+  PRINTER = 'printer',
 }
 
 export class CreateSaleDto {
