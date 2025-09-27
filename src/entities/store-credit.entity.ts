@@ -39,7 +39,7 @@ export class StoreCredit {
   @ManyToOne(() => Store, (store) => store.storeCredits, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'customer_id', referencedColumnName: 'id' })
+  @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
   store: Store;
 
   @Column('uuid')

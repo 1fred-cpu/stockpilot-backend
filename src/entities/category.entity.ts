@@ -11,16 +11,17 @@ import {
 import { Business } from './business.entity';
 import { Store } from './store.entity';
 import { Product } from './product.entity';
+import { Discount } from './discount.entity';
 
 @Entity('categories')
 export class Category {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', nullable:true })
+  @Column({ type: 'uuid', nullable: true })
   business_id: string;
 
-  @Column({ type: 'uuid' , nullable:true})
+  @Column({ type: 'uuid', nullable: true })
   store_id: string;
 
   @Column({ type: 'text' })
@@ -44,8 +45,9 @@ export class Category {
   @JoinColumn({ name: 'store_id', referencedColumnName: 'id' })
   store: Store;
 
-  @OneToMany(() => Product, (product) => product.category, {
-    onDelete: 'CASCADE',
-  })
+  @OneToMany(() => Product, (product) => product.category)
   products: Product[];
+
+  @OneToMany(() => Discount, (discount) => discount.category)
+  discounts: Discount[];
 }

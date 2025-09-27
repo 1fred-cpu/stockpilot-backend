@@ -24,6 +24,7 @@ import { Invite } from './invite.entity';
 import { StoreCredit } from './store-credit.entity';
 import { Refund } from './refund.entity';
 import { Exchange } from './exchange.entity';
+import { Discount } from './discount.entity';
 
 @Entity('stores')
 export class Store {
@@ -123,4 +124,8 @@ export class Store {
   // 👇 Relation: one store can have many exchange items
   @OneToMany(() => Exchange, (exchange) => exchange.store)
   exchanges: Exchange[];
+
+  // 👇 Relation: one store can have many discounts
+  @OneToMany(() => Discount, (discount) => discount.store)
+  discounts: Discount[];
 }

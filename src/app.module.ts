@@ -20,7 +20,6 @@ import { BusinessModule } from './modules/business/business.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulesServiceModule } from './schedules/schedule.module';
-import { MigrationService } from './migration/migration.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { QrcodeModule } from './modules/qrcode/qrcode.module';
 
@@ -66,7 +65,6 @@ import { ReturnsModule } from './modules/returns/returns.module';
   ],
   controllers: [AppController],
   providers: [
-    MigrationService,
     AppService,
     {
       provide: APP_GUARD,

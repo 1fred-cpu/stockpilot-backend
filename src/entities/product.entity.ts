@@ -12,6 +12,7 @@ import { Business } from './business.entity';
 import { Category } from './category.entity';
 import { ProductVariant } from './product-variant.entity';
 import { Store } from './store.entity';
+import { Discount } from './discount.entity';
 
 @Entity('products')
 export class Product {
@@ -77,6 +78,9 @@ export class Product {
 
   @OneToMany(() => ProductVariant, (productVariant) => productVariant.product)
   productVariants: ProductVariant[];
+
+  @OneToMany(() => Discount, (discount) => discount.product)
+  discounts: Discount[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
