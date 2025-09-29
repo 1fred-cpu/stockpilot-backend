@@ -47,6 +47,9 @@ export class Exchange {
         default: ExchangeStatus.PENDING
     })
     status: ExchangeStatus;
+    
+    @Column({type:"int8", default:0})
+    quantity:number
 
     @CreateDateColumn({ type: "timestamptz" })
     created_at: Date;

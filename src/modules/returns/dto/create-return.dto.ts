@@ -37,6 +37,7 @@ export class ReturnItemDto {
 
 export class ExchangeItemDto {
   newProductVariantId: string;
+  quantity:number
 }
 
 export class CreateReturnDto {
