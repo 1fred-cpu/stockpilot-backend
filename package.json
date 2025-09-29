@@ -37,6 +37,8 @@
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/typeorm": "^11.0.0",
     "@supabase/supabase-js": "^2.54.0",
+    "axios": "^1.12.2",
+    "big-integer": "^1.6.52",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "eventemitter2": "^6.4.9",

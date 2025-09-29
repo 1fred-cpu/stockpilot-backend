@@ -17,6 +17,7 @@ import { StoreInventory } from 'src/entities/store-inventory.entity';
 import { StoreUser } from 'src/entities/store-user.entity';
 import { User } from 'src/entities/user.entity';
 import { JwtHelper } from 'src/helpers/jwt.helper';
+import { Sale } from 'src/entities/sale.entity';
 @Module({
   imports: [
     SupabaseModule,
@@ -29,6 +30,7 @@ import { JwtHelper } from 'src/helpers/jwt.helper';
       StoreInventory,
       StoreUser,
       User,
+      Sale,
     ]),
   ],
   controllers: [StoresController],

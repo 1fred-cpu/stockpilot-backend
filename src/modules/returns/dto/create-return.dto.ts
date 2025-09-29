@@ -8,6 +8,7 @@ import {
   IsArray,
   ValidateNested,
   IsEnum,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReturnResolution } from 'src/entities/return.entity';
@@ -42,8 +43,9 @@ export class CreateReturnDto {
   @IsUUID()
   storeId: string;
 
-  @IsUUID()
-  saleId: string;
+  @IsString()
+  @IsNotEmpty()
+  saleCode: string;
 
   @IsOptional()
   @IsUUID()

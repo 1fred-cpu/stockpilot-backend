@@ -16,6 +16,7 @@ export enum DeliveryChannel {
   EMAIL = 'email',
   WHATSAPP = 'whatsapp',
   PRINTER = 'printer',
+  NONE = '',
 }
 
 export class CreateSaleDto {

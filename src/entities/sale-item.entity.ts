@@ -12,6 +12,7 @@ import { Business } from './business.entity';
 import { ProductVariant } from './product-variant.entity';
 import { Store } from './store.entity';
 import { Sale } from './sale.entity';
+import { Return } from './return.entity';
 
 @Entity('sale_items')
 export class SaleItem {
@@ -69,7 +70,12 @@ export class SaleItem {
   @JoinColumn({ name: 'variant_id', referencedColumnName: 'id' })
   productVariant: ProductVariant;
 
-  @ManyToOne(() => Sale, (sale) => sale.saleItems)
+  @ManyToOne(() => Sale, (sale) => sale.saleItems, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'sale_id', referencedColumnName: 'id' })
   sale: Sale;
+
+  @OneToMany(() => Return, (ret) => ret.saleItem)
+  returns: Return[];
 }

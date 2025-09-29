@@ -24,8 +24,8 @@ export class StoreCredit {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  customer_id: string;
+  @Column({ type: 'uuid', nullable: true, default: null })
+  customer_id: string | null;
 
   @ManyToOne(() => Customer, (customer) => customer.storeCredits, {
     onDelete: 'CASCADE',
@@ -51,7 +51,7 @@ export class StoreCredit {
   @JoinColumn({ name: 'return_id', referencedColumnName: 'id' })
   return: Return;
 
-  @Column('decimal', { precision: 12, scale: 2 })
+  @Column('float8')
   amount: number; // total credit issued
 
   @Column('decimal', { precision: 12, scale: 2, default: 0 })

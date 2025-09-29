@@ -24,6 +24,11 @@ export class SalesController {
     return this.salesService.createSale(createSaleDto);
   }
 
+  @Get(':saleCode')
+  async findSale(@Param('saleCode') saleCode: string) {
+    return this.salesService.findSale(saleCode);
+  }
+
   @Get('stores/:storeId')
   async getDailySales(
     @Param('storeId', ParseUUIDPipe) storeId: string,

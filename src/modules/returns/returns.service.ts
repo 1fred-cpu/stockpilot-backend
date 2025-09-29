@@ -22,6 +22,7 @@ import { CreateReturnPolicyDto } from './dto/create-return-policy.dto';
 import { UpdateReturnPolicyDto } from './dto/update-return-policy.dto';
 import { ReturnPolicy } from 'src/entities/return-policy.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import { uuidToReadable } from 'src/utils/generate-reference';
 export class ReturnsService {
   constructor(
     private dataSource: DataSource,
@@ -36,7 +37,7 @@ export class ReturnsService {
       return this.dataSource.transaction(async (manager) => {
         // 1. Validate sale
         const sale = await manager.findOne(Sale, {
-          where: { id: dto.saleId },
+          where: { sale_code: dto.saleCode },
         });
         if (!sale) throw new NotFoundException('Sale not found');
 
@@ -48,7 +49,7 @@ export class ReturnsService {
             where: { id: item.saleItemId },
           });
 
-          if (!saleItem || saleItem.sale_id !== dto.saleId) {
+          if (!saleItem || saleItem.sale_id !== sale.id) {
             throw new NotFoundException(
               `Sale item ${item.saleItemId} not found for this sale`,
             );
@@ -59,7 +60,7 @@ export class ReturnsService {
           // Create return record
           const ret = manager.create(Return, {
             store_id: dto.storeId,
-            sale_id: dto.saleId,
+            sale_id: sale.id,
             sale_item_id: item.saleItemId,
             reason: item.reason,
             resolution: item.resolution,
@@ -144,7 +145,7 @@ export class ReturnsService {
       for (const returnId of dto.returnIds) {
         const ret = await manager.findOne(Return, {
           where: { id: returnId },
-          relations: ['sale_item'],
+          relations: ['saleItem'],
         });
         if (!ret) throw new NotFoundException(`Return ${returnId} not found`);
 
@@ -181,6 +182,7 @@ export class ReturnsService {
         if (ret.resolution === ReturnResolution.REFUND) {
           const refund = manager.create(Refund, {
             return_id: ret.id,
+            store_id: dto.storeId,
             amount: lineAmount,
             method: dto.refundMethod ?? sale.payment_method ?? 'cash',
             status: RefundStatus.INITIATED,
@@ -362,7 +364,7 @@ export class ReturnsService {
     try {
       const returns = await this.returnRepo.find({
         where: { store_id: storeId },
-        relations: ['sale', 'saleItem', 'refunds', 'exchanges', 'storeCredits'],
+        relations: ['saleItem', 'saleItem.productVariant'],
         order: { created_at: 'DESC' }, // newest first
       });
       if (returns.length === 0) return [];
@@ -402,7 +404,7 @@ export class ReturnsService {
         await manager.delete(Return, { id: ret.id });
 
         return {
-          success: true,
+          onSuccess: true,
           message: 'Return and related records deleted',
         };
       });
@@ -418,6 +420,7 @@ export class ReturnsService {
           relations: ['customer', 'return'], // preload related entities if needed
           order: { created_at: 'DESC' }, // show newest first
         });
+        if (credits.length === 0) return [];
 
         return credits;
       });
@@ -436,10 +439,14 @@ export class ReturnsService {
           allow_refund: dto.allowRefund,
           allow_exchange: dto.allowExchange,
           allow_store_credit: dto.allowStoreCredit,
+          require_receipt: dto.requireReceipt,
+          restocking_fee: dto.restockingFee,
+          max_items_per_return: dto.maxItemsPerReturn,
           notes: dto.notes || null,
         });
 
-        return await manager.save(policy);
+        await manager.save(policy);
+        return { onSuccess: true, policy };
       });
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'createReturnPolicy');
@@ -449,16 +456,21 @@ export class ReturnsService {
   // READ (fetch one by store)
   async getReturnPolicy(storeId: string) {
     try {
-      return await this.dataSource.getRepository(ReturnPolicy).findOne({
+      const policy = await this.dataSource.getRepository(ReturnPolicy).findOne({
         where: { store_id: storeId },
       });
+
+      if (!policy) {
+        throw new NotFoundException('Return policy not found');
+      }
+      return { success: true, policy };
     } catch (error) {
       this.errorHandler.handleServiceError(error, 'getReturnPolicy');
     }
   }
 
   // UPDATE
-  async updateReturnPolicy(storeId: string, dto: Partial<ReturnPolicy>) {
+  async updateReturnPolicy(storeId: string, dto: UpdateReturnPolicyDto) {
     try {
       return this.dataSource.transaction(async (manager) => {
         const repo = manager.getRepository(ReturnPolicy);
@@ -468,7 +480,17 @@ export class ReturnsService {
         });
         if (!existing) throw new NotFoundException('Return policy not found');
 
-        repo.merge(existing, dto);
+        const payload = {
+          days_allowed: dto.daysAllowed,
+          allow_refund: dto.allowRefund,
+          allow_exchange: dto.allowExchange,
+          allow_store_credit: dto.allowStoreCredit,
+          require_receipt: dto.requireReceipt,
+          restocking_fee: dto.restockingFee,
+          max_items_per_return: dto.maxItemsPerReturn,
+          notes: dto.notes,
+        };
+        repo.merge(existing, payload);
         return await repo.save(existing);
       });
     } catch (error) {

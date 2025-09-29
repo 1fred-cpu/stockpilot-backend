@@ -1,26 +1,35 @@
-import { IsUUID, IsBoolean, IsOptional, IsString, IsArray, ArrayNotEmpty } from "class-validator";
+import {
+  IsUUID,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsArray,
+  ArrayNotEmpty,
+  IsNotEmpty,
+} from 'class-validator';
 
 export class ReviewReturnDto {
-    @IsArray()
-    @ArrayNotEmpty()
-    @IsUUID("4", { each: true })
-    returnIds: string[];
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  returnIds: string[];
 
-    @IsBoolean()
-    approve: boolean;
+  @IsBoolean()
+  approve: boolean;
 
-    @IsOptional()
-    @IsString()
-    notes?: string;
+  @IsOptional()
+  @IsString()
+  notes?: string;
 
-    @IsOptional()
-    @IsString()
-    managerId?: string;
-    
-    @IsString()
-    storeId: string;
+  @IsOptional()
+  @IsString()
+  managerId?: string;
 
-    @IsOptional()
-    @IsString()
-    refundMethod?: string; // cash | card | store_credit
+  @IsString()
+  @IsNotEmpty()
+  storeId: string;
+
+  @IsOptional()
+  @IsString()
+  refundMethod?: string; // cash | card | store_credit
 }

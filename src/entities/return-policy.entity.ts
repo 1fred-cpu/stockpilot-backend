@@ -25,6 +25,15 @@ export class ReturnPolicy {
   @Column({ type: 'boolean', default: true })
   allow_store_credit: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  require_receipt: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  restocking_fee: number;
+
+  @Column({ type: 'int', default: 5 })
+  max_items_per_return: number;
+
   @Column({ type: 'text', nullable: true, default: null })
   notes?: string | null;
 

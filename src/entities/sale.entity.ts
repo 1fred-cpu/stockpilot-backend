@@ -22,6 +22,9 @@ export class Sale {
   @Column({ type: 'uuid' })
   store_id: string;
 
+  @Column({ type: 'text', nullable: true, default: null })
+  sale_code: string | null;
+
   @Column({ type: 'uuid' })
   business_id: string;
 

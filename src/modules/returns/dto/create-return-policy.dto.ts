@@ -1,4 +1,12 @@
-import { IsUUID, IsInt, Min, IsBoolean, IsOptional, IsString } from "class-validator";
+import {
+  IsUUID,
+  IsInt,
+  Min,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateReturnPolicyDto {
   @IsUUID()
@@ -16,6 +24,19 @@ export class CreateReturnPolicyDto {
 
   @IsBoolean()
   allowStoreCredit: boolean;
+
+  @IsBoolean()
+  requireReceipt: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  restockingFee: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxItemsPerReturn: number;
 
   @IsOptional()
   @IsString()
